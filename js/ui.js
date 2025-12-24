@@ -31,6 +31,17 @@ async function getKeybindModule() {
 // Minimum volume threshold to consider audio as "playing" (avoids floating point precision issues)
 const MIN_AUDIO_VOLUME = 0.001;
 
+// Setup performance stats toggle
+export function setupPerformanceStats() {
+    const toggleStatsBtn = document.getElementById('toggle-stats');
+    const perfStats = document.getElementById('perf-stats');
+    if (toggleStatsBtn && perfStats) {
+        toggleStatsBtn.addEventListener('click', () => {
+            perfStats.style.display = perfStats.style.display === 'none' ? 'block' : 'none';
+        });
+    }
+}
+
 export function setupTechInfoPanel() {
     const toggleBtn = document.getElementById('tech-toggle-btn');
     const panel = document.getElementById('tech-info-panel');
@@ -646,7 +657,11 @@ function setupControlsPanel() {
     });
 }
 
-// Performance presets
+// Performance presets - Quick optimization configurations for different hardware capabilities
+// Low: Maximum performance - all effects disabled for lowest-end hardware
+// Mid: Balanced settings - moderate bloom intensity (0.5) with all effects enabled
+// High: Best visuals - high bloom intensity (0.7) with all effects enabled
+// Custom: Automatically selected when user modifies individual settings
 const PERFORMANCE_PRESETS = {
     low: {
         antialiasing: false,
@@ -674,485 +689,264 @@ const PERFORMANCE_PRESETS = {
     }
 };
 
-function setupVideoPanel() {
-    const presetSelect = document.getElementById('performance-preset');
-    const antialiasingToggle = document.getElementById('toggle-antialiasing');
-    const bloomToggle = document.getElementById('toggle-bloom');
-    const fogToggle = document.getElementById('toggle-fog');
-    const snowToggle = document.getElementById('toggle-snow');
-    const leavesToggle = document.getElementById('toggle-leaves');
+function setupSlider(id, initialValue, onUpdate, min = 0, max = 1, displayMultiplier = 100, displaySuffix = '%') {
+    const slider = document.getElementById(id + '-slider') || document.getElementById(id.replace('toggle-', '') + '-slider'); 
+    const fill = document.getElementById(id + '-fill') || document.getElementById(id.replace('toggle-', '') + '-fill');
+    const handle = document.getElementById(id + '-handle') || document.getElementById(id.replace('toggle-', '') + '-handle');
+    const percentage = document.getElementById(id + '-percentage') || document.getElementById(id.replace('toggle-', '') + '-percentage');
+    const track = slider ? slider.querySelector('.volume-slider-track') : null;
 
-    if (!antialiasingToggle || !bloomToggle || !fogToggle || !snowToggle || !leavesToggle) {
-        console.warn('Video panel elements not found');
-        return;
-    }
-
-    // Flag to prevent toggles from switching preset to 'custom' when applying a preset
-    let isApplyingPreset = false;
-
-    // Initialize video state from localStorage or defaults
-    const savedPreset = localStorage.getItem('performancePreset') || 'mid';
-    const antialiasingEnabled = localStorage.getItem('antialiasingEnabled') !== 'false';
-    const bloomEnabled = localStorage.getItem('bloomEnabled') !== 'false';
-    const fogEnabled = localStorage.getItem('fogEnabled') !== 'false';
-    const snowEnabled = localStorage.getItem('snowEnabled') !== 'false';
-    const leavesEnabled = localStorage.getItem('leavesEnabled') !== 'false';
-    const bloomIntensity = parseFloat(localStorage.getItem('bloomIntensity')) ?? 0.7;
-
-    // Set preset dropdown
-    if (presetSelect) {
-        presetSelect.value = savedPreset;
-    }
-
-    antialiasingToggle.checked = antialiasingEnabled;
-    bloomToggle.checked = bloomEnabled;
-    fogToggle.checked = fogEnabled;
-    snowToggle.checked = snowEnabled;
-    leavesToggle.checked = leavesEnabled;
-
-    // Initialize bloom intensity slider
-    setupBloomSlider(bloomIntensity);
-
-    // Apply initial state
-    applyVideoSettings(antialiasingEnabled, bloomEnabled, fogEnabled, bloomIntensity, snowEnabled, leavesEnabled);
-
-    // Preset Select
-    if (presetSelect) {
-        presetSelect.addEventListener('change', (e) => {
-            const preset = e.target.value;
-            localStorage.setItem('performancePreset', preset);
-            
-            // Set flag to prevent toggles from switching preset back to 'custom'
-            isApplyingPreset = true;
-            
-            if (preset !== 'custom') {
-                const presetConfig = PERFORMANCE_PRESETS[preset];
-                if (presetConfig) {
-                    // Apply preset values - set checked state
-                    antialiasingToggle.checked = presetConfig.antialiasing;
-                    bloomToggle.checked = presetConfig.bloom;
-                    fogToggle.checked = presetConfig.fog;
-                    snowToggle.checked = presetConfig.snow;
-                    leavesToggle.checked = presetConfig.leaves;
-                    
-                    // Force visual update by dispatching change events
-                    antialiasingToggle.dispatchEvent(new Event('change', { bubbles: false }));
-                    bloomToggle.dispatchEvent(new Event('change', { bubbles: false }));
-                    fogToggle.dispatchEvent(new Event('change', { bubbles: false }));
-                    snowToggle.dispatchEvent(new Event('change', { bubbles: false }));
-                    leavesToggle.dispatchEvent(new Event('change', { bubbles: false }));
-                    
-                    // Update bloom slider (skip preset update since we're applying a preset)
-                    updateBloomSliderValue(presetConfig.bloomIntensity, false, true);
-                    
-                    // Save to localStorage
-                    localStorage.setItem('antialiasingEnabled', presetConfig.antialiasing);
-                    localStorage.setItem('bloomEnabled', presetConfig.bloom);
-                    localStorage.setItem('fogEnabled', presetConfig.fog);
-                    localStorage.setItem('snowEnabled', presetConfig.snow);
-                    localStorage.setItem('leavesEnabled', presetConfig.leaves);
-                    localStorage.setItem('bloomIntensity', presetConfig.bloomIntensity);
-                    
-                    // Apply settings
-                    applyVideoSettings(
-                        presetConfig.antialiasing,
-                        presetConfig.bloom,
-                        presetConfig.fog,
-                        presetConfig.bloomIntensity,
-                        presetConfig.snow,
-                        presetConfig.leaves
-                    );
-                    
-                    updateBloomSliderState();
-                    console.log('Performance preset:', preset);
-                }
-            } else {
-                // Custom preset - load saved values
-                const customAntialiasing = localStorage.getItem('antialiasingEnabled') !== 'false';
-                const customBloom = localStorage.getItem('bloomEnabled') !== 'false';
-                const customFog = localStorage.getItem('fogEnabled') !== 'false';
-                const customSnow = localStorage.getItem('snowEnabled') !== 'false';
-                const customLeaves = localStorage.getItem('leavesEnabled') !== 'false';
-                const customBloomIntensity = parseFloat(localStorage.getItem('bloomIntensity')) || 0.7;
-                
-                antialiasingToggle.checked = customAntialiasing;
-                bloomToggle.checked = customBloom;
-                fogToggle.checked = customFog;
-                snowToggle.checked = customSnow;
-                leavesToggle.checked = customLeaves;
-                updateBloomSliderValue(customBloomIntensity, false);
-                applyVideoSettings(customAntialiasing, customBloom, customFog, customBloomIntensity, customSnow, customLeaves);
-                updateBloomSliderState();
-            }
-            
-            // Ensure preset value is set correctly after all updates
-            if (presetSelect) {
-                presetSelect.value = preset;
-            }
-            
-            // Reset flag after preset is applied
-            isApplyingPreset = false;
-        });
-    }
-
-    // Antialiasing Toggle
-    antialiasingToggle.addEventListener('change', (e) => {
-        const enabled = e.target.checked;
-        localStorage.setItem('antialiasingEnabled', enabled);
-        
-        // Only switch to custom if not applying a preset
-        if (!isApplyingPreset) {
-            if (presetSelect) presetSelect.value = 'custom';
-            localStorage.setItem('performancePreset', 'custom');
-        }
-        
-        const bloomEnabled = bloomToggle.checked;
-        const fogEnabled = fogToggle.checked;
-        const snowEnabled = snowToggle.checked;
-        const leavesEnabled = leavesToggle.checked;
-        const bloomIntensityValue = localStorage.getItem('bloomIntensity');
-        // CRITICAL: Properly handle 0 as valid value - only use default if null/undefined/NaN
-        let bloomIntensity;
-        if (bloomIntensityValue === null) {
-            bloomIntensity = 0.7;
-        } else {
-            const parsed = parseFloat(bloomIntensityValue);
-            bloomIntensity = isNaN(parsed) ? 0.7 : parsed;
-        }
-        applyVideoSettings(enabled, bloomEnabled, fogEnabled, bloomIntensity, snowEnabled, leavesEnabled);
-        console.log('Antialiasing:', enabled ? 'ON' : 'OFF');
-    });
-
-    // Bloom Toggle
-    bloomToggle.addEventListener('change', (e) => {
-        const enabled = e.target.checked;
-        localStorage.setItem('bloomEnabled', enabled);
-        
-        // Only switch to custom if not applying a preset
-        if (!isApplyingPreset) {
-            if (presetSelect) presetSelect.value = 'custom';
-            localStorage.setItem('performancePreset', 'custom');
-        }
-        
-        const antialiasingEnabled = antialiasingToggle.checked;
-        const fogEnabled = fogToggle.checked;
-        const snowEnabled = snowToggle.checked;
-        const leavesEnabled = leavesToggle.checked;
-        const bloomIntensityValue = localStorage.getItem('bloomIntensity');
-        // CRITICAL: Properly handle 0 as valid value - only use default if null/undefined/NaN
-        let bloomIntensity;
-        if (bloomIntensityValue === null) {
-            bloomIntensity = 0.7;
-        } else {
-            const parsed = parseFloat(bloomIntensityValue);
-            bloomIntensity = isNaN(parsed) ? 0.7 : parsed;
-        }
-        applyVideoSettings(antialiasingEnabled, enabled, fogEnabled, bloomIntensity, snowEnabled, leavesEnabled);
-        updateBloomSliderState();
-        console.log('Bloom Effect:', enabled ? 'ON' : 'OFF');
-    });
-
-    // Fog Toggle
-    fogToggle.addEventListener('change', (e) => {
-        const enabled = e.target.checked;
-        localStorage.setItem('fogEnabled', enabled);
-        
-        // Only switch to custom if not applying a preset
-        if (!isApplyingPreset) {
-            if (presetSelect) presetSelect.value = 'custom';
-            localStorage.setItem('performancePreset', 'custom');
-        }
-        
-        const antialiasingEnabled = antialiasingToggle.checked;
-        const bloomEnabled = bloomToggle.checked;
-        const snowEnabled = snowToggle.checked;
-        const leavesEnabled = leavesToggle.checked;
-        const bloomIntensityValue = localStorage.getItem('bloomIntensity');
-        // CRITICAL: Properly handle 0 as valid value - only use default if null/undefined/NaN
-        let bloomIntensity;
-        if (bloomIntensityValue === null) {
-            bloomIntensity = 0.7;
-        } else {
-            const parsed = parseFloat(bloomIntensityValue);
-            bloomIntensity = isNaN(parsed) ? 0.7 : parsed;
-        }
-        applyVideoSettings(antialiasingEnabled, bloomEnabled, enabled, bloomIntensity, snowEnabled, leavesEnabled);
-        console.log('Fog:', enabled ? 'ON' : 'OFF');
-    });
-
-    // Snow Toggle
-    snowToggle.addEventListener('change', (e) => {
-        const enabled = e.target.checked;
-        localStorage.setItem('snowEnabled', enabled);
-        
-        // Only switch to custom if not applying a preset
-        if (!isApplyingPreset) {
-            if (presetSelect) presetSelect.value = 'custom';
-            localStorage.setItem('performancePreset', 'custom');
-        }
-        
-        const antialiasingEnabled = antialiasingToggle.checked;
-        const bloomEnabled = bloomToggle.checked;
-        const fogEnabled = fogToggle.checked;
-        const leavesEnabled = leavesToggle.checked;
-        const bloomIntensityValue = localStorage.getItem('bloomIntensity');
-        // CRITICAL: Properly handle 0 as valid value - only use default if null/undefined/NaN
-        let bloomIntensity;
-        if (bloomIntensityValue === null) {
-            bloomIntensity = 0.7;
-        } else {
-            const parsed = parseFloat(bloomIntensityValue);
-            bloomIntensity = isNaN(parsed) ? 0.7 : parsed;
-        }
-        applyVideoSettings(antialiasingEnabled, bloomEnabled, fogEnabled, bloomIntensity, enabled, leavesEnabled);
-        console.log('Snow Particles:', enabled ? 'ON' : 'OFF');
-    });
-
-    // Leaves Toggle
-    leavesToggle.addEventListener('change', (e) => {
-        const enabled = e.target.checked;
-        localStorage.setItem('leavesEnabled', enabled);
-        
-        // Only switch to custom if not applying a preset
-        if (!isApplyingPreset) {
-            if (presetSelect) presetSelect.value = 'custom';
-            localStorage.setItem('performancePreset', 'custom');
-        }
-        
-        const antialiasingEnabled = antialiasingToggle.checked;
-        const bloomEnabled = bloomToggle.checked;
-        const fogEnabled = fogToggle.checked;
-        const snowEnabled = snowToggle.checked;
-        const bloomIntensityValue = localStorage.getItem('bloomIntensity');
-        // CRITICAL: Properly handle 0 as valid value - only use default if null/undefined/NaN
-        let bloomIntensity;
-        if (bloomIntensityValue === null) {
-            bloomIntensity = 0.7;
-        } else {
-            const parsed = parseFloat(bloomIntensityValue);
-            bloomIntensity = isNaN(parsed) ? 0.7 : parsed;
-        }
-        applyVideoSettings(antialiasingEnabled, bloomEnabled, fogEnabled, bloomIntensity, snowEnabled, enabled);
-        console.log('Leaves Particles:', enabled ? 'ON' : 'OFF');
-    });
-}
-
-function setupBloomSlider(initialValue) {
-    const slider = document.getElementById('bloom-intensity-slider');
-    const track = slider?.querySelector('.volume-slider-track');
-    const fill = document.getElementById('bloom-intensity-fill');
-    const handle = document.getElementById('bloom-intensity-handle');
-    const percentage = document.getElementById('bloom-intensity-percentage');
-
-    if (!slider || !track || !fill || !handle || !percentage) {
-        console.warn('Bloom slider elements not found');
-        return;
-    }
+    if (!slider || !fill || !handle || !percentage || !track) return;
 
     let isDragging = false;
     let animationFrameId = null;
 
-    // Set initial value
-    updateBloomSliderValue(initialValue, false);
-
-    // Simple function to calculate percentage from mouse/touch position
-    const getPercentageFromEvent = (clientX) => {
-        const rect = track.getBoundingClientRect();
-        const x = clientX - rect.left;
-        return Math.max(0, Math.min(1, x / rect.width));
+    const updateUI = (val) => {
+        const percent = (val - min) / (max - min);
+        const clampedPercent = Math.max(0, Math.min(1, percent));
+        
+        fill.style.width = `${clampedPercent * 100}%`;
+        handle.style.left = `${clampedPercent * 100}%`;
+        
+        let displayVal = val * displayMultiplier;
+        if (displayMultiplier >= 100) displayVal = Math.round(displayVal);
+        else displayVal = Math.round(displayVal * 10) / 10;
+        
+        percentage.textContent = `${displayVal}${displaySuffix}`;
     };
 
-    // Update slider value from event
-    const updateFromEvent = (e, isDraggingFlag) => {
+    // Allow external updates
+    slider.setValue = (val) => {
+        updateUI(val);
+    };
+
+    updateUI(initialValue);
+
+    const getValueFromEvent = (clientX) => {
+        const rect = track.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const percent = Math.max(0, Math.min(1, x / rect.width));
+        return min + percent * (max - min);
+    };
+
+    const updateFromEvent = (e) => {
         const clientX = e.clientX || e.touches?.[0]?.clientX;
         if (clientX === undefined) return;
         
-        const percent = getPercentageFromEvent(clientX);
-        updateBloomSliderValue(percent, isDraggingFlag);
+        const val = getValueFromEvent(clientX);
+        updateUI(val);
+        if (onUpdate) onUpdate(val);
     };
 
-    // Start dragging
     const startDrag = (e) => {
         isDragging = true;
         slider.classList.add('dragging');
         e.preventDefault();
         e.stopPropagation();
-        updateFromEvent(e, true);
+        updateFromEvent(e);
     };
 
-    // Handle drag movement
     const handleDrag = (e) => {
         if (!isDragging) return;
         e.preventDefault();
-        
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
-        
-        animationFrameId = requestAnimationFrame(() => {
-            updateFromEvent(e, true);
-        });
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(() => updateFromEvent(e));
     };
 
-    // Stop dragging
     const stopDrag = () => {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-        }
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
         isDragging = false;
         slider.classList.remove('dragging');
     };
 
-    // Click on track to jump to position
     track.addEventListener('click', (e) => {
-        if (!isDragging && e.target !== handle && !handle.contains(e.target)) {
-            updateFromEvent(e, false);
-        }
+        if (!isDragging && e.target !== handle) updateFromEvent(e);
     });
 
-    // Handle mouse events
-    handle.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        startDrag(e);
-    });
-    
+    handle.addEventListener('mousedown', (e) => { e.stopPropagation(); startDrag(e); });
     document.addEventListener('mousemove', handleDrag);
     document.addEventListener('mouseup', stopDrag);
 
-    // Handle touch events
-    handle.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        startDrag(e);
-    });
-    
-    document.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-        e.preventDefault();
-        
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
-        
-        animationFrameId = requestAnimationFrame(() => {
-            updateFromEvent(e, true);
-        });
-    });
-    
+    handle.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); startDrag(e); });
+    document.addEventListener('touchmove', handleDrag);
     document.addEventListener('touchend', stopDrag);
 }
 
-function updateBloomSliderValue(value, isDragging = false, skipPresetUpdate = false) {
-    const fill = document.getElementById('bloom-intensity-fill');
-    const handle = document.getElementById('bloom-intensity-handle');
-    const percentage = document.getElementById('bloom-intensity-percentage');
+// [TRACE: ARCHITECTURE.md] Video Settings Panel Setup
+// Initializes comprehensive graphics configuration system with performance presets, render scale,
+// antialiasing, post-processing, bloom controls, fog, and particle toggles.
+// All settings persist to localStorage and apply in real-time via updateVideoSettings() in main.js.
+function setupVideoPanel() {
     const presetSelect = document.getElementById('performance-preset');
+    const antialiasingToggle = document.getElementById('toggle-antialiasing');
+    const postProcessingToggle = document.getElementById('toggle-post-processing');
+    const bloomToggle = document.getElementById('toggle-bloom');
+    const fogToggle = document.getElementById('toggle-fog');
+    const snowToggle = document.getElementById('toggle-snow');
+    const leavesToggle = document.getElementById('toggle-leaves');
 
-    if (!fill || !handle || !percentage) return;
+    // Helper to get typed settings from localStorage with fallback defaults
+    const getBool = (key, def) => {
+        const val = localStorage.getItem(key);
+        return val === null ? def : val !== 'false';
+    };
+    const getFloat = (key, def) => {
+        const val = localStorage.getItem(key);
+        return val === null ? def : parseFloat(val);
+    };
 
-    const clampedValue = Math.max(0, Math.min(1, value));
-    const percentageValue = Math.round(clampedValue * 100);
-    const percentageString = `${clampedValue * 100}%`;
+    // Current state - tracks all video settings for real-time updates
+    let state = {
+        antialiasing: getBool('antialiasingEnabled', true),
+        renderScale: getFloat('renderScale', 1.0),
+        postProcessing: getBool('postProcessingEnabled', true),
+        bloomEnabled: getBool('bloomEnabled', true),
+        bloomIntensity: getFloat('bloomIntensity', 0.7),
+        bloomRadius: getFloat('bloomRadius', 0.4),
+        bloomThreshold: getFloat('bloomThreshold', 0.8),
+        fogEnabled: getBool('fogEnabled', false), // Default to off for menu visibility
+        fogDensity: getFloat('fogDensity', 0.00), // Default to 0
+        snowEnabled: getBool('snowEnabled', true),
+        leavesEnabled: getBool('leavesEnabled', true)
+    };
 
-    // Update visual elements instantly
-    fill.style.width = percentageString;
-    handle.style.left = percentageString;
-    percentage.textContent = `${percentageValue}%`;
+    let isApplyingPreset = false; // Prevents preset auto-switch during preset application
 
-    // Save to localStorage (throttle during dragging)
-    const now = Date.now();
-    if (!isDragging || !updateBloomSliderValue.lastSave || now - updateBloomSliderValue.lastSave > 50) {
-        localStorage.setItem('bloomIntensity', clampedValue.toString());
-        updateBloomSliderValue.lastSave = now;
-        if (presetSelect && !skipPresetUpdate) {
+    // Update function - applies settings changes and triggers real-time updates
+    const update = (changes) => {
+        state = { ...state, ...changes };
+        
+        // Save to localStorage - uses descriptive keys for clarity
+        Object.entries(changes).forEach(([key, val]) => {
+            if (key === 'antialiasing') localStorage.setItem('antialiasingEnabled', val);
+            else if (key === 'postProcessing') localStorage.setItem('postProcessingEnabled', val);
+            else localStorage.setItem(key, val);
+        });
+
+        // Auto-switch to Custom preset when user modifies individual settings
+        // This ensures preset dropdown accurately reflects current configuration
+        if (presetSelect && !isApplyingPreset && (changes.antialiasing !== undefined || changes.bloomEnabled !== undefined || changes.fogEnabled !== undefined || changes.snowEnabled !== undefined || changes.leavesEnabled !== undefined || changes.bloomIntensity !== undefined)) {
             presetSelect.value = 'custom';
             localStorage.setItem('performancePreset', 'custom');
         }
+
+        // Apply visual updates to toggles if needed (e.g. from preset)
+        if (isApplyingPreset) {
+            if (antialiasingToggle) antialiasingToggle.checked = state.antialiasing;
+            if (postProcessingToggle) postProcessingToggle.checked = state.postProcessing;
+            if (bloomToggle) bloomToggle.checked = state.bloomEnabled;
+            if (fogToggle) fogToggle.checked = state.fogEnabled;
+            if (snowToggle) snowToggle.checked = state.snowEnabled;
+            if (leavesToggle) leavesToggle.checked = state.leavesEnabled;
+            
+            // Update sliders using the setValue method attached by setupSlider
+            const setSlider = (id, val) => {
+                const slider = document.getElementById(id + '-slider');
+                if (slider && slider.setValue) slider.setValue(val);
+            };
+            setSlider('render-scale', state.renderScale);
+            setSlider('bloom-intensity', state.bloomIntensity);
+            setSlider('bloom-radius', state.bloomRadius);
+            setSlider('bloom-threshold', state.bloomThreshold);
+            setSlider('fog-density', state.fogDensity);
+        }
+
+        updateBloomSliderState();
+        applyVideoSettings(state);
+    };
+
+    // Bind Toggles
+    const bindToggle = (el, key) => {
+        if (el) {
+            el.checked = state[key];
+            el.addEventListener('change', (e) => update({ [key]: e.target.checked }));
+        }
+    };
+    bindToggle(antialiasingToggle, 'antialiasing');
+    bindToggle(postProcessingToggle, 'postProcessing');
+    bindToggle(bloomToggle, 'bloomEnabled');
+    bindToggle(fogToggle, 'fogEnabled');
+    bindToggle(snowToggle, 'snowEnabled');
+    bindToggle(leavesToggle, 'leavesEnabled');
+
+    // Bind Sliders
+    setupSlider('render-scale', state.renderScale, (v) => update({ renderScale: v }), 0.1, 2.0, 100, '%');
+    setupSlider('bloom-intensity', state.bloomIntensity, (v) => update({ bloomIntensity: v }), 0, 3.0, 10, '');
+    setupSlider('bloom-radius', state.bloomRadius, (v) => update({ bloomRadius: v }), 0, 1.0, 10, '');
+    setupSlider('bloom-threshold', state.bloomThreshold, (v) => update({ bloomThreshold: v }), 0, 1.0, 10, '');
+    setupSlider('fog-density', state.fogDensity, (v) => update({ fogDensity: v }), 0, 0.2, 1000, ''); // Display x1000 for fog
+
+    // Bind Preset
+    if (presetSelect) {
+        presetSelect.value = localStorage.getItem('performancePreset') || 'mid';
+        presetSelect.addEventListener('change', (e) => {
+            const preset = e.target.value;
+            localStorage.setItem('performancePreset', preset);
+            
+            if (preset !== 'custom' && PERFORMANCE_PRESETS[preset]) {
+                isApplyingPreset = true;
+                const p = PERFORMANCE_PRESETS[preset];
+                update({
+                    antialiasing: p.antialiasing,
+                    bloomEnabled: p.bloom,
+                    fogEnabled: p.fog,
+                    snowEnabled: p.snow,
+                    leavesEnabled: p.leaves,
+                    bloomIntensity: p.bloomIntensity
+                });
+                isApplyingPreset = false;
+            }
+        });
     }
 
-    // Apply to video settings (throttle during dragging)
-    if (!isDragging || !updateBloomSliderValue.lastVideoUpdate || now - updateBloomSliderValue.lastVideoUpdate > 16) {
-        const antialiasingEnabled = document.getElementById('toggle-antialiasing')?.checked ?? true;
-        const bloomEnabled = document.getElementById('toggle-bloom')?.checked ?? true;
-        const fogEnabled = document.getElementById('toggle-fog')?.checked ?? true;
-        const snowEnabled = document.getElementById('toggle-snow')?.checked ?? true;
-        const leavesEnabled = document.getElementById('toggle-leaves')?.checked ?? true;
-        applyVideoSettings(antialiasingEnabled, bloomEnabled, fogEnabled, clampedValue, snowEnabled, leavesEnabled);
-        updateBloomSliderValue.lastVideoUpdate = now;
-    }
+    // Initial Apply
+    applyVideoSettings(state);
+    updateBloomSliderState();
 }
 
+// Updates bloom slider disabled state - disables bloom-specific sliders when bloom toggle is off
+// Prevents user confusion by disabling controls that have no effect when bloom is disabled
 function updateBloomSliderState() {
     const bloomToggle = document.getElementById('toggle-bloom');
-    const bloomControl = document.querySelector('#tab-video .video-control-item:nth-child(3)');
-
-    if (bloomControl) {
-        if (bloomToggle && !bloomToggle.checked) {
-            bloomControl.classList.add('disabled');
-        } else {
-            bloomControl.classList.remove('disabled');
+    // Disable bloom-specific sliders if bloom is off
+    const ids = ['bloom-intensity', 'bloom-radius', 'bloom-threshold'];
+    
+    ids.forEach(id => {
+        const slider = document.getElementById(id + '-slider');
+        const container = slider?.closest('.video-control-item');
+        if (container) {
+            if (bloomToggle && !bloomToggle.checked) {
+                container.classList.add('disabled');
+            } else {
+                container.classList.remove('disabled');
+            }
         }
-    }
+    });
 }
 
-function applyVideoSettings(antialiasingEnabled, bloomEnabled, fogEnabled, bloomIntensity, snowEnabled, leavesEnabled) {
-    // Import scene objects dynamically
-    import('./main.js').then(({ scene, renderer, composer, particleManager }) => {
-        if (!renderer || !composer) {
-            console.warn('Renderer or composer not available');
-            return;
-        }
+// [TRACE: ARCHITECTURE.md] Applies video settings to renderer, composer, scene, and particle manager
+// Uses dynamic import to avoid circular dependencies and ensure main.js is loaded
+// Maps UI settings to updateVideoSettings() parameters for real-time application
+function applyVideoSettings(settings) {
+    // Import scene objects dynamically - avoids circular dependencies
+    import('./main.js').then(({ updateVideoSettings, particleManager }) => {
+        updateVideoSettings({
+            antialiasing: settings.antialiasing,
+            pixelRatio: settings.renderScale,
+            postProcessing: settings.postProcessing,
+            bloomEnabled: settings.bloomEnabled,
+            bloomStrength: settings.bloomIntensity,
+            bloomRadius: settings.bloomRadius,
+            bloomThreshold: settings.bloomThreshold,
+            fogEnabled: settings.fogEnabled,
+            fogDensity: settings.fogDensity
+        });
 
-        // Apply antialiasing (requires renderer recreation, so we'll skip for now)
-        // Note: Changing antialiasing requires recreating the renderer, which is complex
-        // For now, we'll just log it
-        if (antialiasingEnabled !== undefined) {
-            console.log('Antialiasing setting:', antialiasingEnabled ? 'ON' : 'OFF');
-            // TODO: Implement renderer recreation for antialiasing toggle
+        if (particleManager) {
+            if (settings.snowEnabled !== undefined) particleManager.setSnowEnabled(settings.snowEnabled);
+            if (settings.leavesEnabled !== undefined) particleManager.setLeavesEnabled(settings.leavesEnabled);
         }
-
-        // Apply bloom effect
-        if (bloomEnabled !== undefined) {
-            const bloomPass = composer.passes.find(pass => pass.constructor.name === 'UnrealBloomPass');
-            if (bloomPass) {
-                bloomPass.enabled = bloomEnabled;
-            }
-        }
-
-        // Apply bloom intensity
-        if (bloomIntensity !== undefined) {
-            const bloomPass = composer.passes.find(pass => pass.constructor.name === 'UnrealBloomPass');
-            if (bloomPass) {
-                bloomPass.strength = bloomIntensity;
-            }
-        }
-
-        // Apply fog
-        if (fogEnabled !== undefined && scene) {
-            if (fogEnabled) {
-                // Re-enable fog if it was disabled
-                if (!scene.fog) {
-                    scene.fog = new THREE.FogExp2(0x020205, 0.007);
-                }
-            } else {
-                // Disable fog
-                scene.fog = null;
-            }
-        }
-
-        // Apply snow particles
-        if (snowEnabled !== undefined && particleManager) {
-            particleManager.setSnowEnabled(snowEnabled);
-        }
-
-        // Apply leaves particles
-        if (leavesEnabled !== undefined && particleManager) {
-            particleManager.setLeavesEnabled(leavesEnabled);
-        }
-    }).catch(err => {
-        console.warn('Could not apply video settings:', err);
-    });
+    }).catch(err => console.warn('Could not apply video settings:', err));
 }
 
 function applyAudioSettings(masterEnabled, musicEnabled, masterVolume, musicVolume) {
@@ -1291,32 +1085,44 @@ export function setupWorldGenPanel() {
     const lightsToggle = document.getElementById('toggle-lights');
     const houseToggle = document.getElementById('toggle-house');
     const hillsToggle = document.getElementById('toggle-hills');
+    const seedInput = document.getElementById('world-seed');
+
+    // Load saved world generation settings
+    const savedWorldSettings = localStorage.getItem('worldGenSettings');
+    if (savedWorldSettings) {
+        try {
+            const settings = JSON.parse(savedWorldSettings);
+            if (treeToggle && settings.trees !== undefined) treeToggle.checked = settings.trees;
+            if (lightsToggle && settings.lights !== undefined) lightsToggle.checked = settings.lights;
+            if (houseToggle && settings.house !== undefined) houseToggle.checked = settings.house;
+            if (hillsToggle && settings.hills !== undefined) hillsToggle.checked = settings.hills;
+            if (seedInput && settings.seed !== undefined) seedInput.value = settings.seed;
+        } catch (e) {
+            console.error('Error parsing saved world settings:', e);
+        }
+    }
 
     if (treeToggle) {
         treeToggle.addEventListener('change', (e) => {
             console.log('Trees:', e.target.checked ? 'ON' : 'OFF');
-            // TODO: Implement tree visibility toggle
         });
     }
 
     if (lightsToggle) {
         lightsToggle.addEventListener('change', (e) => {
             console.log('Christmas Lights:', e.target.checked ? 'ON' : 'OFF');
-            // TODO: Implement lights visibility toggle
         });
     }
 
     if (houseToggle) {
         houseToggle.addEventListener('change', (e) => {
             console.log('House:', e.target.checked ? 'ON' : 'OFF');
-            // TODO: Implement house visibility toggle
         });
     }
 
     if (hillsToggle) {
         hillsToggle.addEventListener('change', (e) => {
             console.log('Hills:', e.target.checked ? 'ON' : 'OFF');
-            // TODO: Implement hills visibility toggle
         });
     }
     
@@ -1331,8 +1137,12 @@ export function setupWorldGenPanel() {
                 trees: treeToggle ? treeToggle.checked : true,
                 lights: lightsToggle ? lightsToggle.checked : true,
                 house: houseToggle ? houseToggle.checked : true,
-                hills: hillsToggle ? hillsToggle.checked : true
+                hills: hillsToggle ? hillsToggle.checked : true,
+                seed: seedInput ? seedInput.value.trim() : ''
             };
+
+            // Save settings to localStorage
+            localStorage.setItem('worldGenSettings', JSON.stringify(options));
             
             // Disable button during generation
             generateBtn.disabled = true;
@@ -1826,6 +1636,32 @@ export function setupUI() {
     // Setup menu button sound effects
     setupMenuButtonSounds();
 
+    // Setup global message listener for C# communication
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.addEventListener('message', event => {
+            const message = event.data;
+            // Message can be a string or an object depending on how it's sent
+            // If sent via PostWebMessageAsString, it's a string.
+            // If sent via PostWebMessageAsJson, it's an object.
+            
+            // We'll assume C# might send a JSON string for load-world
+            if (typeof message === 'string') {
+                try {
+                    const data = JSON.parse(message);
+                    if (data.type === 'load-world-data') {
+                        handleLoadedWorld(data.data);
+                    }
+                } catch (e) {
+                    // Not JSON or other message
+                }
+            } else if (typeof message === 'object') {
+                 if (message.type === 'load-world-data') {
+                     handleLoadedWorld(message.data);
+                 }
+            }
+        });
+    }
+
     // Toggle UI Visibility
     uiBtn.addEventListener('click', () => {
         if (uiVisible) {
@@ -1883,6 +1719,7 @@ export function setupUI() {
     // These will be set up after splash is dismissed (in startApp)
     // But we can set up the event handlers now
     setupTechInfoPanel();
+    setupPerformanceStats();
     setupWorldGenPanel();
     setupGalleryPanel();
     setupSettingsPanel();
@@ -1892,10 +1729,81 @@ export function setupUI() {
     // setupCountdownTimer(); // Moved to splash dismissal
 }
 
+// Handle loaded world data
+async function handleLoadedWorld(data) {
+    if (!data || !data.worldSettings) {
+        console.error('Invalid world data loaded');
+        return;
+    }
+
+    console.log('Loading world:', data);
+
+    // Update localStorage
+    localStorage.setItem('worldGenSettings', JSON.stringify(data.worldSettings));
+
+    // Update UI elements
+    const treeToggle = document.getElementById('toggle-trees');
+    const lightsToggle = document.getElementById('toggle-lights');
+    const houseToggle = document.getElementById('toggle-house');
+    const hillsToggle = document.getElementById('toggle-hills');
+    const seedInput = document.getElementById('world-seed');
+    
+    if (treeToggle && data.worldSettings.trees !== undefined) treeToggle.checked = data.worldSettings.trees;
+    if (lightsToggle && data.worldSettings.lights !== undefined) lightsToggle.checked = data.worldSettings.lights;
+    if (houseToggle && data.worldSettings.house !== undefined) houseToggle.checked = data.worldSettings.house;
+    if (hillsToggle && data.worldSettings.hills !== undefined) hillsToggle.checked = data.worldSettings.hills;
+    if (seedInput && data.worldSettings.seed !== undefined) seedInput.value = data.worldSettings.seed;
+
+    // Trigger regeneration
+    // We need to simulate the generation flow
+    const { regenerateWorld, enterFirstPersonMode, resumeGame } = await import('./main.js');
+    const { showLoadingScreen, hideLoadingScreen, updateProgress } = await import('./loading-screen.js');
+
+    // Close pause menu
+    const pauseMenu = document.getElementById('pause-menu');
+    if (pauseMenu) {
+        pauseMenu.classList.remove('pause-menu-visible');
+        pauseMenu.classList.add('pause-menu-hidden');
+    }
+
+    // Show loading
+    showLoadingScreen();
+
+    try {
+        const progressCallback = (percentage, statusText) => {
+            updateProgress(percentage, statusText);
+        };
+
+        const groundHeight = await regenerateWorld(data.worldSettings, progressCallback);
+        
+        updateProgress(100, 'World loaded!');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // We are likely already in first person mode if using pause menu
+        // But if we loaded from somewhere else, we might need to enter it.
+        // If we are already in game, we just need to resume.
+        // But regenerateWorld resets the world, so we need to re-enter or reset controls?
+        // regenerateWorld keeps the camera/controls but clears the scene content.
+        // enterFirstPersonMode resets controls if needed.
+        
+        // Let's assume we want to stay in or enter first person mode.
+        enterFirstPersonMode(groundHeight);
+        resumeGame(); // Unlock pointer and hide menu
+        
+        hideLoadingScreen();
+        
+    } catch (err) {
+        console.error('Error loading world:', err);
+        hideLoadingScreen();
+    }
+}
+
 // Setup pause menu
 export function setupPauseMenu() {
     const pauseMenu = document.getElementById('pause-menu');
     const resumeBtn = document.getElementById('pause-resume-btn');
+    const saveBtn = document.getElementById('pause-save-btn');
+    const loadBtn = document.getElementById('pause-load-btn');
     const settingsBtn = document.getElementById('pause-settings-btn');
     const quitBtn = document.getElementById('pause-quit-btn');
     
@@ -1917,6 +1825,79 @@ export function setupPauseMenu() {
             
             const { resumeGame } = await import('./main.js');
             resumeGame();
+        });
+    }
+
+    // Save World button
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const { playClickSound } = await getUISoundsModule();
+            playClickSound();
+
+            // Get current world settings
+            const savedWorldSettings = localStorage.getItem('worldGenSettings');
+            const worldSettings = savedWorldSettings ? JSON.parse(savedWorldSettings) : {};
+            
+            // Collect data to save
+            const saveData = {
+                timestamp: Date.now(),
+                worldSettings: worldSettings,
+                // Add more data here (e.g. player position)
+            };
+
+            // Send to C#
+            if (window.chrome && window.chrome.webview) {
+                // Send as a prefixed string for easier parsing in C# without JSON library
+                window.chrome.webview.postMessage('save-world:' + JSON.stringify(saveData));
+            } else {
+                console.warn('Save World only supported in desktop app');
+                // Fallback: Download JSON file
+                const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `world-${Date.now()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        });
+    }
+
+    // Load World button
+    if (loadBtn) {
+        loadBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const { playClickSound } = await getUISoundsModule();
+            playClickSound();
+
+            // Request load from C#
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage('load-world');
+            } else {
+                 console.warn('Load World only supported in desktop app');
+                 // Fallback: File input
+                 const input = document.createElement('input');
+                 input.type = 'file';
+                 input.accept = '.json';
+                 input.onchange = (e) => {
+                     const file = e.target.files[0];
+                     if (!file) return;
+                     const reader = new FileReader();
+                     reader.onload = async (event) => {
+                         try {
+                             const data = JSON.parse(event.target.result);
+                             handleLoadedWorld(data);
+                         } catch (err) {
+                             console.error('Error loading world:', err);
+                         }
+                     };
+                     reader.readAsText(file);
+                 };
+                 input.click();
+            }
         });
     }
     

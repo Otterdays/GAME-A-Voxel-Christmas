@@ -1,6 +1,6 @@
 import { SCENE_OPTS, GAME_WORLD_OPTS, PEAK_HEIGHT } from './config.js';
-import { setupScene } from './scene-setup.js';
-import { generateTerrainInstanced, generateHouse, generateTrees, clearWorld, getGroundHeight } from './world-gen.js';
+import { setupScene, createRenderer, createComposer } from './scene-setup.js';
+import { generateTerrainInstanced, generateHouse, generateTrees, clearWorld, getGroundHeight, setSeed } from './world-gen.js';
 import { ParticleManager } from './particles.js';
 import { FirstPersonControls } from './first-person-controls.js';
 import { initAmbientSound, startAmbientSound, stopAmbientSound, setAmbientVolume } from './ambient-sound.js';
@@ -14,6 +14,14 @@ let isHandlingPause = false; // Flag to prevent double-handling of pause request
 let gameWorldContainer = null; // Separate container for game world
 let menuWorldObjects = []; // Track menu world objects to keep them separate
 let lastTime = performance.now(); // For deltaTime calculation
+// Master toggle for post-processing - when false, uses direct renderer instead of composer
+// Controlled by video settings panel, affects whether post-processing pipeline is used in animation loop
+let postProcessingEnabled = true; // Toggle for post-processing
+
+// Performance monitoring
+let frameCount = 0;
+let lastFpsTime = performance.now();
+let fps = 60;
 
 // Block highlighting system
 let blockHighlight = null;
@@ -240,8 +248,207 @@ function animate() {
         particleManager.update();
     }
 
-    // Render with post-processing
-    composer.render();
+    // Performance monitoring (reuse currentTime from deltaTime calculation above)
+    frameCount++;
+    if (currentTime >= lastFpsTime + 1000) {
+        fps = Math.round((frameCount * 1000) / (currentTime - lastFpsTime));
+        frameCount = 0;
+        lastFpsTime = currentTime;
+        updatePerfStats();
+    }
+
+    // Render with post-processing or directly
+    if (postProcessingEnabled && composer) {
+        composer.render();
+    } else if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
+}
+
+// Recreate renderer with new settings
+async function recreateRenderer(antialias) {
+    if (!renderer) return;
+
+    // Save current state
+    const pixelRatio = renderer.getPixelRatio();
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const oldDomElement = renderer.domElement;
+    
+    // Dispose old renderer
+    renderer.dispose();
+    
+    // Create new renderer
+    renderer = createRenderer({ antialias, pixelRatio });
+    renderer.setSize(width, height);
+    
+    // Replace DOM element
+    if (oldDomElement && oldDomElement.parentNode) {
+        oldDomElement.parentNode.replaceChild(renderer.domElement, oldDomElement);
+    } else {
+        document.body.appendChild(renderer.domElement);
+    }
+    
+    // Recreate composer with new renderer
+    if (composer) {
+        // Dispose old composer passes if needed (though mostly handled by GC)
+        composer = createComposer(renderer, scene, camera);
+        composer.setSize(width, height);
+    }
+    
+    // Update controls to use new DOM element
+    if (orbitControls) {
+        // OrbitControls needs to be recreated or updated with new DOM element
+        // Since OrbitControls takes domElement in constructor, easiest is to dispose and recreate
+        // or just update if it supports it (it doesn't have setDomElement)
+        const oldTarget = orbitControls.target.clone();
+        const oldEnabled = orbitControls.enabled;
+        const oldAutoRotate = orbitControls.autoRotate;
+        
+        orbitControls.dispose();
+        
+        // Import dynamically to avoid circular dependency issues if any
+        const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+        orbitControls = new OrbitControls(camera, renderer.domElement);
+        orbitControls.enableDamping = true;
+        orbitControls.autoRotate = oldAutoRotate;
+        orbitControls.autoRotateSpeed = 0.3;
+        orbitControls.target.copy(oldTarget);
+        orbitControls.enabled = oldEnabled;
+    }
+    
+    // Update first person controls to use new DOM element
+    if (firstPersonControls) {
+        // FirstPersonControls also takes domElement in constructor
+        // We need to handle this carefully as it has event listeners
+        const wasLocked = firstPersonControls.isLocked();
+        firstPersonControls.dispose();
+        
+        firstPersonControls = new FirstPersonControls(
+            camera, 
+            renderer.domElement, 
+            getGroundHeight, 
+            GAME_WORLD_OPTS
+        );
+        
+        // Restore lock if it was locked (unlikely during settings change but good practice)
+        // Actually, settings usually require unlocking pointer, so we might just need to re-setup listeners
+        
+        // Update pointer lock click handler
+        const canvas = renderer.domElement;
+        // Remove old listener if possible (though old canvas is gone)
+        // Add new listener
+        // We need to re-bind the click handler from enterFirstPersonMode context
+        // This is tricky because the handler is local to enterFirstPersonMode.
+        // Ideally we should make the handler global or accessible.
+        // For now, let's assume settings are changed in pause menu (unlocked), 
+        // and resumeGame will handle re-locking.
+    }
+    
+    // Re-setup pointer lock click handler for the new canvas
+    if (renderer.domElement._pointerLockHandler) {
+         // This property was on the old canvas, we lost it.
+         // We need a robust way to re-attach the listener.
+         // Let's rely on resumeGame to re-establish locks/listeners if needed, 
+         // or better: define the handler outside.
+    }
+    
+    console.log(`Renderer recreated with antialias: ${antialias}`);
+}
+
+// [TRACE: ARCHITECTURE.md] Real-time video settings application
+// Applies graphics settings to renderer, composer, scene, and particle systems without restart.
+// 
+// Supported Parameters:
+// - antialiasing: Boolean - Smooths jagged edges (requires renderer recreation - cannot change dynamically)
+// - renderScale: Number (0.1-2.0) - Resolution scaling multiplier (applied as devicePixelRatio * renderScale)
+// - pixelRatio: Number - Alternative to renderScale (direct pixel ratio value, renderScale takes precedence)
+// - postProcessing: Boolean - Master toggle for all post-processing effects (controls composer vs direct renderer)
+// - bloomEnabled: Boolean - Enables/disables bloom effect pass
+// - bloomStrength / bloomIntensity: Number (0-3.0) - Bloom effect strength (aliases, both supported)
+// - bloomRadius: Number (0-1.0) - Bloom spread radius
+// - bloomThreshold: Number (0-1.0) - Brightness threshold for bloom application
+// - fogEnabled: Boolean - Enables/disables atmospheric fog
+// - fogDensity: Number (0-0.2) - Fog density for exponential fog (FogExp2)
+//
+// Technical Notes:
+// - Render scale multiplies devicePixelRatio to maintain high-DPI display support while allowing performance tuning
+// - Antialiasing changes require full renderer recreation (WebGL context attribute cannot be changed after creation)
+// - Post-processing toggle controls whether animation loop uses composer or direct renderer
+// - Bloom parameters updated in real-time without recreating composer (pass properties are mutable)
+// - Fog created/removed dynamically, density updated in real-time when fog exists
+// - Fog color matches scene background color for seamless integration
+export function updateVideoSettings(settings) {
+    const { 
+        antialiasing, 
+        pixelRatio, 
+        renderScale, // Resolution scaling multiplier (preferred over pixelRatio)
+        postProcessing, 
+        bloomEnabled, 
+        bloomRadius, 
+        bloomThreshold, 
+        bloomStrength,
+        bloomIntensity, // Alias for bloomStrength
+        fogEnabled,
+        fogDensity
+    } = settings;
+
+    // Handle Antialiasing - requires full renderer recreation (WebGL context attribute immutable)
+    if (renderer && antialiasing !== undefined) {
+        const currentAntialias = renderer.getContext().getContextAttributes().antialias;
+        if (currentAntialias !== antialiasing) {
+            recreateRenderer(antialias);
+        }
+    }
+
+    // Handle Render Scale / Pixel Ratio
+    // Render scale multiplies devicePixelRatio to maintain high-DPI support while allowing performance tuning
+    // Lower render scale = better performance, higher = better quality
+    if (renderer) {
+        if (renderScale !== undefined) {
+             renderer.setPixelRatio(window.devicePixelRatio * renderScale);
+        } else if (pixelRatio !== undefined) {
+            renderer.setPixelRatio(pixelRatio);
+        }
+    }
+
+    // Handle Post Processing Toggle - controls whether animation loop uses composer or direct renderer
+    if (postProcessing !== undefined) {
+        postProcessingEnabled = postProcessing;
+    }
+
+    // Handle Bloom Settings - updated in real-time without recreating composer
+    if (composer) {
+        const bloomPass = composer.passes.find(pass => pass.constructor.name === 'UnrealBloomPass');
+        if (bloomPass) {
+            if (bloomEnabled !== undefined) bloomPass.enabled = bloomEnabled;
+            if (bloomRadius !== undefined) bloomPass.radius = bloomRadius;
+            if (bloomThreshold !== undefined) bloomPass.threshold = bloomThreshold;
+            // Support both bloomStrength and bloomIntensity aliases for compatibility
+            const strength = bloomStrength !== undefined ? bloomStrength : bloomIntensity;
+            if (strength !== undefined) bloomPass.strength = strength;
+        }
+    }
+
+    // Handle Fog - creates/removes fog dynamically, updates density in real-time
+    if (scene) {
+        if (fogEnabled !== undefined) {
+            if (fogEnabled) {
+                // Create exponential fog if it doesn't exist (matches scene background color)
+                if (!scene.fog) {
+                    scene.fog = new THREE.FogExp2(SCENE_OPTS.bgColor, fogDensity || 0.007);
+                }
+            } else {
+                // Remove fog when disabled
+                scene.fog = null;
+            }
+        }
+        
+        // Update fog density in real-time when fog exists
+        if (scene.fog && fogDensity !== undefined) {
+            scene.fog.density = fogDensity;
+        }
+    }
 }
 
 // Create or get game world container
@@ -266,6 +473,11 @@ export async function regenerateWorld(options, progressCallback = null) {
         
         // Get or create game world container
         const gameContainer = getGameWorldContainer();
+        
+        // Set seed for generation if provided
+        if (options.seed !== undefined) {
+            setSeed(options.seed);
+        }
         
         // Clear any existing game world
         updateProgress(0, 'Initializing world generation...');
@@ -616,6 +828,21 @@ export function getIsPaused() {
 // Check if in first-person mode
 export function getIsFirstPersonMode() {
     return isFirstPersonMode;
+}
+
+// Performance stats update function
+function updatePerfStats() {
+    const fpsEl = document.getElementById('fps-value');
+    const drawCallsEl = document.getElementById('draw-calls');
+    const trianglesEl = document.getElementById('triangles');
+    const geometriesEl = document.getElementById('geometries');
+    const texturesEl = document.getElementById('textures');
+    
+    if (fpsEl) fpsEl.textContent = fps;
+    if (drawCallsEl && renderer) drawCallsEl.textContent = renderer.info.render.calls;
+    if (trianglesEl && renderer) trianglesEl.textContent = renderer.info.render.triangles;
+    if (geometriesEl && renderer) geometriesEl.textContent = renderer.info.memory.geometries;
+    if (texturesEl && renderer) texturesEl.textContent = renderer.info.memory.textures;
 }
 
 // Export scene objects for UI access

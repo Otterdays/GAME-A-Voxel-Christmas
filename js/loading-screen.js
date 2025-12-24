@@ -21,7 +21,7 @@ export function showLoadingScreen() {
     const newsReel = document.getElementById('news-reel');
     const audioWarning = document.querySelector('.audio-warning');
     const uiButtons = document.querySelectorAll('.ui-btn, .tech-toggle-btn');
-    const panels = document.querySelectorAll('#world-gen-panel, #settings-panel, #tech-info-panel');
+    const panels = document.querySelectorAll('#world-gen-panel, #settings-panel, #tech-info-panel, #pause-menu');
     const countdownTimer = document.getElementById('countdown-timer');
     const techPanel = document.getElementById('tech-info-panel');
     

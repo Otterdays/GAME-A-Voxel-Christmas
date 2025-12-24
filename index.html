@@ -160,6 +160,10 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
+                    <div class="toggle-item">
+                        <span class="toggle-label">Seed</span>
+                        <input type="text" id="world-seed" class="seed-input" placeholder="Random (leave empty)" maxlength="20">
+                    </div>
                 </div>
                 <button id="generate-world-btn" class="generate-world-btn">Generate World</button>
             </div>
@@ -367,6 +371,23 @@
                             <div class="video-control-desc">Quick preset configurations for performance</div>
                         </div>
 
+                        <!-- Render Scale Control -->
+                        <div class="video-control-item">
+                            <div class="video-control-header">
+                                <span class="video-control-label">Render Scale</span>
+                            </div>
+                            <div class="volume-slider-container">
+                                <div class="volume-slider" id="render-scale-slider">
+                                    <div class="volume-slider-track">
+                                        <div class="volume-slider-fill" id="render-scale-fill"></div>
+                                        <div class="volume-slider-handle" id="render-scale-handle"></div>
+                                    </div>
+                                </div>
+                                <span class="volume-percentage" id="render-scale-percentage">100%</span>
+                            </div>
+                            <div class="video-control-desc">Resolution scale (lower = better performance)</div>
+                        </div>
+
                         <!-- Antialiasing Control -->
                         <div class="video-control-item">
                             <div class="video-control-header">
@@ -379,6 +400,18 @@
                             <div class="video-control-desc">Smooths jagged edges (may impact performance)</div>
                         </div>
 
+                        <!-- Post Processing Toggle -->
+                        <div class="video-control-item">
+                            <div class="video-control-header">
+                                <span class="video-control-label">Post Processing</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-postprocessing" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="video-control-desc">Master toggle for all post-processing effects</div>
+                        </div>
+
                         <!-- Bloom Effect Control -->
                         <div class="video-control-item">
                             <div class="video-control-header">
@@ -388,6 +421,8 @@
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
+                            <!-- Intensity -->
+                            <div class="video-control-sublabel">Intensity</div>
                             <div class="volume-slider-container">
                                 <div class="volume-slider" id="bloom-intensity-slider">
                                     <div class="volume-slider-track">
@@ -396,6 +431,28 @@
                                     </div>
                                 </div>
                                 <span class="volume-percentage" id="bloom-intensity-percentage">70%</span>
+                            </div>
+                            <!-- Radius -->
+                            <div class="video-control-sublabel">Radius</div>
+                            <div class="volume-slider-container">
+                                <div class="volume-slider" id="bloom-radius-slider">
+                                    <div class="volume-slider-track">
+                                        <div class="volume-slider-fill" id="bloom-radius-fill"></div>
+                                        <div class="volume-slider-handle" id="bloom-radius-handle"></div>
+                                    </div>
+                                </div>
+                                <span class="volume-percentage" id="bloom-radius-percentage">50%</span>
+                            </div>
+                            <!-- Threshold -->
+                            <div class="video-control-sublabel">Threshold</div>
+                            <div class="volume-slider-container">
+                                <div class="volume-slider" id="bloom-threshold-slider">
+                                    <div class="volume-slider-track">
+                                        <div class="volume-slider-fill" id="bloom-threshold-fill"></div>
+                                        <div class="volume-slider-handle" id="bloom-threshold-handle"></div>
+                                    </div>
+                                </div>
+                                <span class="volume-percentage" id="bloom-threshold-percentage">40%</span>
                             </div>
                         </div>
 
@@ -407,6 +464,16 @@
                                     <input type="checkbox" id="toggle-fog" checked>
                                     <span class="toggle-slider"></span>
                                 </label>
+                            </div>
+                            <!-- Density -->
+                            <div class="volume-slider-container">
+                                <div class="volume-slider" id="fog-density-slider">
+                                    <div class="volume-slider-track">
+                                        <div class="volume-slider-fill" id="fog-density-fill"></div>
+                                        <div class="volume-slider-handle" id="fog-density-handle"></div>
+                                    </div>
+                                </div>
+                                <span class="volume-percentage" id="fog-density-percentage">0.7%</span>
                             </div>
                             <div class="video-control-desc">Atmospheric distance fog</div>
                         </div>
@@ -464,6 +531,9 @@
             <div class="pause-menu-buttons">
                 <button id="pause-resume-btn" class="pause-menu-btn">▶ Resume</button>
                 <button id="pause-settings-btn" class="pause-menu-btn">⚙️ Settings</button>
+                <button id="pause-save-btn" class="pause-menu-btn">💾 Save World</button>
+                <button id="pause-load-btn" class="pause-menu-btn">📂 Load World</button>
+                <input type="file" id="load-world-input" accept=".json" style="display: none;">
                 <button id="pause-quit-btn" class="pause-menu-btn">🚪 Quit to Menu</button>
             </div>
         </div>
@@ -472,6 +542,18 @@
     <button id="ui-toggle" class="ui-btn">Hide UI</button>
     <button id="fullscreen-btn" class="ui-btn">⛶ Fullscreen</button>
     <button id="quit-btn" class="ui-btn">✕ Quit</button>
+
+    <!-- Performance Stats -->
+    <button id="toggle-stats" style="position: fixed; top: 10px; right: 10px; padding: 5px 10px; z-index: 10001; background: #333; color: #0f0; border: 1px solid #0f0; cursor: pointer;">
+        📊 Stats
+    </button>
+    <div id="perf-stats" style="position: fixed; top: 45px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; z-index: 10000; display: none;">
+        <div>FPS: <span id="fps-value">60</span></div>
+        <div>Draw Calls: <span id="draw-calls">0</span></div>
+        <div>Triangles: <span id="triangles">0</span></div>
+        <div>Geometries: <span id="geometries">0</span></div>
+        <div>Textures: <span id="textures">0</span></div>
+    </div>
 
     <button id="tech-toggle-btn" class="tech-toggle-btn">⚙️ Tech</button>
     <div id="tech-info-panel" class="tech-panel-hidden">

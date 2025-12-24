@@ -48,33 +48,21 @@ cursor: pointer;
 font-weight: 600;
 letter-spacing: 1px;
 backdrop-filter: blur(10px);
+box-shadow: 0 0 20px rgba(150, 200, 255, 0.2);
 transition: all 0.3s ease;
 ```
 
 **Hover State**:
 ```css
-background: linear-gradient(135deg, rgba(200, 220, 255, 0.3) 0%, rgba(150, 200, 255, 0.4) 100%);
-border-color: rgba(255, 255, 255, 0.5);
+background: linear-gradient(135deg, rgba(220, 240, 255, 0.3) 0%, rgba(170, 220, 255, 0.4) 100%);
 transform: translateY(-2px);
-box-shadow: 0 4px 20px rgba(150, 200, 255, 0.3);
+box-shadow: 0 0 30px rgba(200, 220, 255, 0.4);
+text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
 ```
 
-**Active State**:
-```css
-transform: translateY(0);
-```
+### 2. Standard UI Button (Settings, Fullscreen, Quit)
 
-**Special Effects** (for Play Button):
-- Multiple box-shadows for glow: `0 0 20px rgba(200, 220, 255, 0.6), 0 0 40px rgba(150, 200, 255, 0.4), 0 0 60px rgba(200, 220, 255, 0.2)`
-- Text shadow: `0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(200, 220, 255, 0.6)`
-- Optional: Pulsing glow animation (`snowGlow` keyframes)
-- Optional: Decorative snowflake emojis in pseudo-elements
-
----
-
-### 2. Secondary UI Button (`.ui-btn`)
-
-**Use Case**: Standard UI controls (Hide UI, Fullscreen, etc.)
+**Use Case**: Secondary controls that should be accessible but not distracting.
 
 **Base Styles**:
 ```css
@@ -92,108 +80,7 @@ backdrop-filter: blur(4px);
 **Hover State**:
 ```css
 background: rgba(255, 255, 255, 0.2);
-```
-
-**Disabled State**:
-```css
-pointer-events: none;
-cursor: default;
-opacity: 0;
-```
-
----
-
-### 3. Menu Button (`.menu-btn`)
-
-**Use Case**: Menu items in title screen (Settings, About, etc.)
-
-**Base Styles**:
-```css
-background: rgba(20, 20, 30, 0.6);
-border: 1px solid #444;
-color: #666;
-padding: 15px 0;
-font-size: 1rem;
-letter-spacing: 2px;
-text-transform: uppercase;
-backdrop-filter: blur(4px);
-cursor: not-allowed;
-border-radius: 4px;
-transition: all 0.3s;
-```
-
-**Note**: Menu buttons are typically disabled. Only the Play button should be interactive.
-
----
-
-### 4. Destructive Action Button (Quit Button)
-
-**Use Case**: Actions that close/exit the application
-
-**Base Styles** (extends `.ui-btn`):
-```css
-background: rgba(255, 50, 50, 0.2);
-border-color: rgba(255, 100, 100, 0.4);
-```
-
-**Hover State**:
-```css
-background: rgba(255, 50, 50, 0.4);
-border-color: rgba(255, 100, 100, 0.6);
-```
-
----
-
-### 5. Close Button (`.close-btn`)
-
-**Use Case**: Close buttons in panels/modals
-
-**Base Styles**:
-```css
-background: transparent;
-border: none;
-color: #aaa;
-font-size: 2rem;
-line-height: 1;
-cursor: pointer;
-padding: 0;
-width: 30px;
-height: 30px;
-display: flex;
-align-items: center;
-justify-content: center;
-border-radius: 4px;
-transition: all 0.2s;
-```
-
-**Hover State**:
-```css
-color: #fff;
-background: rgba(255, 255, 255, 0.1);
-```
-
----
-
-### 6. Toggle Button (Tech Toggle)
-
-**Use Case**: Toggle buttons for panels/info displays
-
-**Base Styles**:
-```css
-background: rgba(255, 255, 255, 0.1);
-color: white;
-border: 1px solid rgba(255, 255, 255, 0.2);
-padding: 8px 15px;
-border-radius: 8px;
-cursor: pointer;
-font-size: 0.85rem;
-transition: background 0.2s;
-backdrop-filter: blur(4px);
-```
-
-**Hover State**:
-```css
-background: rgba(255, 255, 255, 0.2);
+transform: translateY(-2px);
 ```
 
 ---
@@ -249,51 +136,31 @@ padding: 25px;
 - **Letter Spacing**: `1px` to `4px` for headings
 
 ### Body Text
-- **Primary**: `1rem` to `1.2rem`, color `#fff` or `#e0e0e0`
-- **Secondary**: `0.9rem` to `1rem`, color `#aaddff`
-- **Tertiary**: `0.85rem`, color `#aaa`
 - **Font Family**: `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`
+- **Size**: `1rem` (16px) standard
+- **Line Height**: `1.5`
+- **Colors**: See Palette
 
 ---
 
-## Spacing Guidelines
+## Interactive Elements
 
-### Padding
-- **Buttons**: `10px 20px` (small), `15px 40px` (large)
-- **Panels**: `20px 25px` (header), `25px` (content)
-- **Containers**: `40px` (splash screen)
+### Sliders (Volume/Settings)
+- **Track**: `rgba(255, 255, 255, 0.1)`
+- **Fill**: `linear-gradient(90deg, rgba(200, 220, 255, 0.6), rgba(150, 200, 255, 0.8))`
+- **Handle**: White circle with subtle shadow and glow
+- **Hover**: Scale handle by `1.15`
 
-### Gaps
-- **Menu Items**: `15px` vertical gap
-- **Toggle Items**: `20px` vertical gap
-- **Tech Boxes**: `6px` vertical gap
+### Toggle Switches
+- **Background**: `rgba(255, 255, 255, 0.2)`
+- **Knob**: White circle
+- **Active Background**: `rgba(200, 220, 255, 0.6)`
+- **Active Glow**: `box-shadow: 0 0 10px rgba(200, 220, 255, 0.4)`
 
-### Border Radius
-- **Buttons**: `8px` (standard), `12px` (primary)
-- **Panels**: `12px`
-- **Small Elements**: `4px` to `6px`
-
----
-
-## Effects & Animations
-
-### Backdrop Filter
-- **Standard**: `blur(4px)` for buttons
-- **Enhanced**: `blur(10px)` for panels
-- **Maximum**: `blur(20px)` for splash screens
-
-### Transitions
-- **Standard**: `0.2s` to `0.3s ease`
-- **Smooth**: `all 0.3s ease` for complex interactions
-
-### Glow Effects
-- **Primary Glow**: `0 0 20px rgba(200, 220, 255, 0.6)`
-- **Secondary Glow**: `0 0 40px rgba(150, 200, 255, 0.4)`
-- **Text Glow**: `0 0 10px rgba(255, 255, 255, 0.8)`
-
-### Hover Transform
-- **Lift Effect**: `translateY(-2px)` on hover
-- **Reset**: `translateY(0)` on active
+### Tabs
+- **Container**: `background: rgba(0, 0, 0, 0.2)`
+- **Tab Item**: Transparent background, text color `#aaa`
+- **Active Tab**: Text color `#fff`, bottom border `2px solid rgba(200, 220, 255, 0.6)`, slight background tint
 
 ---
 
@@ -399,15 +266,17 @@ padding: 25px;
     padding: 20px 25px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-
-.my-panel-content {
-    padding: 25px;
-}
 ```
 
 ---
 
-## Version History
+## Implementation Notes
 
-- **v1.0** (2024-12-XX): Initial style guide created from existing button patterns
-
+### CSS Specificity & State Toggles
+- **Visibility Classes**: State classes like `.pause-menu-hidden` or `.settings-panel-hidden` often use `!important` to ensure they override default element styles (e.g., `display: flex`).
+- **Syntax Integrity**: The CSS file is large. Ensure all blocks are properly closed with `}` to avoid cascading parsing errors that can break subsequent UI components (like Settings Tabs).
+- **Z-Index Layering**:
+  - `z-index: 100` - Standard UI overlays
+  - `z-index: 150` - Pause Menu
+  - `z-index: 200` - Modals (Settings, Gallery)
+  - `z-index: 1000` - Crosshair/Cursor

@@ -3,6 +3,29 @@
 ## [Unreleased]
 
 ### Added
+- **Performance Monitoring System**:
+  - Visual performance stats overlay (FPS, draw calls, triangles, memory)
+  - Toggle button in top-right corner (📊 Stats)
+  - Real-time updates every second
+  - Uses Three.js `renderer.info` API for accurate metrics
+  - Helps track optimization impact during development
+
+### Changed
+- **Performance Optimizations**:
+  - **House Generation**: Converted from ~100 individual meshes to 5 InstancedMesh objects (90% draw call reduction)
+  - **Tree Generation**: Converted from ~1,400-4,000 individual meshes to 4 shared InstancedMesh objects (93% draw call reduction)
+  - **Memory Management**: Enhanced `clearWorld()` function to properly dispose and remove all objects, preventing memory leaks
+  - **Frustum Culling**: Added bounding sphere updates for all InstancedMesh objects to enable accurate view frustum culling
+
+### Fixed
+- **Critical UI Bug Fixes**:
+  - Resolved "Ghost Bar" artifact where the pause menu was visible on the main menu.
+  - Fixed Settings Panel layout issue where tabs would stack vertically.
+  - Corrected CSS syntax error in `style.css` (missing brace) that caused cascading style failures.
+  - Hardened Loading Screen logic to explicitly force-hide the pause menu during initialization.
+  - Eliminated duplicate CSS rules to prevent parsing conflicts.
+
+### Added
 - **Crosshair System**:
   - Centered crosshair displayed in first-person mode
   - Simple white crosshair with horizontal and vertical lines
@@ -61,16 +84,32 @@
   - Functions: `registerBlock()`, `getBlock()`, `removeBlock()`, `clearRegistry()`
   - All blocks automatically registered when created
   - Registry cleared when world is cleared
-- **Video Settings Panel**:
-  - New Video tab in Settings panel with graphics options
-  - Antialiasing toggle (on/off) - smooths jagged edges
-  - Bloom Effect toggle (on/off) with intensity slider (0-100%)
-  - Fog toggle (on/off) - atmospheric distance fog
-  - All settings persist to localStorage
-  - Real-time application of video settings
-  - Styled to match Audio and Controls panels
-  - Bloom intensity slider with draggable handle and percentage display
-  - Disabled state styling when toggles are off
+- **Video Settings System**:
+  - Comprehensive graphics configuration panel in Settings → Video tab
+  - **Performance Presets**: Dropdown selector with Low, Mid, High, and Custom options
+    - Low: All effects disabled (antialiasing off, bloom off, fog off, particles off) for maximum performance
+    - Mid: Balanced settings with moderate bloom intensity (0.5), all effects enabled
+    - High: All effects enabled with high bloom intensity (0.7) for best visuals
+    - Custom: Automatically selected when individual settings are modified
+  - **Render Scale**: Slider (0.1-2.0) for resolution scaling - multiplies devicePixelRatio for performance tuning
+  - **Antialiasing**: Toggle for smoothing jagged edges (requires renderer recreation when changed)
+  - **Post Processing**: Master toggle that enables/disables all post-processing effects
+  - **Bloom Effect**: Toggle with three independent sliders:
+    - Intensity: 0-3.0 (controls bloom strength)
+    - Radius: 0-1.0 (controls bloom spread)
+    - Threshold: 0-1.0 (controls brightness threshold for bloom)
+    - Bloom sliders automatically disabled when bloom toggle is off
+  - **Fog**: Toggle with density slider (0-0.2, displayed x1000 for readability)
+    - Defaults to off for menu visibility
+    - Creates exponential fog (FogExp2) when enabled
+  - **Particle Systems**: Individual toggles for snow and leaves particles
+  - **localStorage Persistence**: All settings automatically saved with keys:
+    - `antialiasingEnabled`, `postProcessingEnabled`, `bloomEnabled`, `bloomIntensity`, `bloomRadius`, `bloomThreshold`
+    - `fogEnabled`, `fogDensity`, `snowEnabled`, `leavesEnabled`, `renderScale`, `performancePreset`
+  - **Real-time Application**: Settings applied immediately without restart via `updateVideoSettings()` in main.js
+  - **Preset Auto-switch**: When individual settings change, preset automatically switches to "Custom" to reflect manual changes
+  - Settings applied to renderer (antialiasing, pixel ratio), composer (bloom), scene (fog), and particle manager (snow/leaves)
+  - Styled to match Audio and Controls panels with consistent UI patterns
 - **Gallery System**:
   - New "Gallery" button added to main menu with Christmas artsy styling
   - Gallery button features warm pink/red gradient matching Christmas theme

@@ -54,6 +54,32 @@ The application can be packaged as a Windows executable using WebView2:
   - Pointer automatically unlocks when paused for menu interaction
   - Pointer re-locks when resuming (requires user click for gesture context)
   - Proper z-index layering (pause menu below settings panel)
+- **Video Settings System** (`updateVideoSettings(settings)`): Real-time graphics settings application
+  - **Supported Parameters**:
+    - `antialiasing`: Boolean - Smooths jagged edges (requires renderer recreation when changed)
+    - `renderScale`: Number (0.1-2.0) - Resolution scaling multiplier (applied as `devicePixelRatio * renderScale`)
+    - `pixelRatio`: Number - Alternative to renderScale (direct pixel ratio value)
+    - `postProcessing`: Boolean - Master toggle for all post-processing effects
+    - `bloomEnabled`: Boolean - Enables/disables bloom effect
+    - `bloomStrength` / `bloomIntensity`: Number (0-3.0) - Bloom effect strength (aliases, both supported)
+    - `bloomRadius`: Number (0-1.0) - Bloom spread radius
+    - `bloomThreshold`: Number (0-1.0) - Brightness threshold for bloom application
+    - `fogEnabled`: Boolean - Enables/disables atmospheric fog
+    - `fogDensity`: Number (0-0.2) - Fog density (exponential fog)
+  - **Renderer Updates**:
+    - Antialiasing changes require full renderer recreation (cannot be changed dynamically)
+    - Render scale multiplies `window.devicePixelRatio` for resolution scaling
+    - Pixel ratio can be set directly or via render scale multiplier
+  - **Post-Processing Updates**:
+    - `postProcessingEnabled` flag controls whether composer or direct renderer is used
+    - Bloom pass parameters updated in real-time when bloom is enabled
+    - Bloom pass can be enabled/disabled without recreating composer
+  - **Fog Management**:
+    - Creates `THREE.FogExp2` when fog is enabled (if not already exists)
+    - Removes fog from scene when disabled
+    - Updates fog density in real-time when fog exists
+    - Default fog color matches scene background color
+  - **Integration**: Called dynamically from `applyVideoSettings()` in `ui.js` via module import
 
 ### 3. Configuration (`js/config.js`)
 - **Menu World Config** (`SCENE_OPTS`): Configuration for menu/preview world
@@ -79,19 +105,22 @@ The application can be packaged as a Windows executable using WebView2:
   - **Renderer**: Uses `THREE.WebGLRenderer` (Standard WebGL).
   - **Post-Processing**: Uses `EffectComposer` with `UnrealBloomPass` for bloom effects.
   - **Window Resize Observer**: Listens to `window.resize` event to update camera aspect ratio, renderer size, and composer size.
-- **`js/world-gen.js`**: Procedural generation logic for the terrain, house, and trees. Uses InstancedMesh for performance.
+- **`js/world-gen.js`**: Procedural generation logic for the terrain, house, and trees. Uses InstancedMesh extensively for optimal performance.
   - **Conditional Generation**: Supports toggles for trees, lights, house, and hills
   - **Container-Based Generation**: All functions accept container parameter (scene or THREE.Group) for flexible world placement
-  - **World Clearing**: `clearWorld(container)` function removes all generated objects from specified container
+  - **World Clearing**: `clearWorld(container)` function properly disposes and removes all generated objects, preventing memory leaks
   - **Ground Height Calculation**: `getGroundHeight(x, z, SCENE_OPTS, useGameHeight)` calculates terrain height at position (supports both menu and game world heights)
   - **Dual World Support**: Functions support both menu world (PEAK_HEIGHT) and game world (GAME_PEAK_HEIGHT) height calculations
-  - **Block Borders**: All blocks have visible edge lines using `THREE.EdgesGeometry` and `THREE.LineSegments`
-  - **Edge Line Rendering**: 
-    - Individual blocks use `LineSegments` with shared `edgeGeometry` and `edgeMaterial`
-    - Instanced terrain uses `InstancedMesh` for edge lines (same instance matrices as regular meshes)
+  - **Instanced Rendering**:
+    - **Terrain**: Uses `InstancedMesh` for dirt and snow blocks (shared geometry, per-instance matrices)
+    - **House**: Uses 5 `InstancedMesh` objects grouped by material (planks, wood, stone, snow, windows) - 90% draw call reduction
+    - **Trees**: Uses 4 shared `InstancedMesh` objects for all tree trunks and leaves across entire world - 93% draw call reduction
+    - All InstancedMesh objects compute bounding spheres after generation for accurate frustum culling
+  - **Block Borders**: All blocks have visible edge lines using `THREE.EdgesGeometry` and instanced rendering
+    - Instanced blocks use `InstancedMesh` for edge lines (same instance matrices as regular meshes)
     - Edge material uses `polygonOffset` to prevent z-fighting
     - Edge lines have `renderOrder = 1` to render after blocks
-  - **Block Registration**: All blocks automatically registered in block registry when created
+  - **Block Registration**: All blocks automatically registered in block registry when created (supports both instanced and individual meshes)
   - **Menu World Optimization**: Snow block edges disabled on menu world (`enableSnowEdges: false`) to prevent flickering
 - **`js/block-registry.js`**: Block tracking system for future destructibility functionality.
   - **Block Data Structure**: Stores position (x, y, z), type (dirt, snow, wood, leaves, stone, plank, window), mesh reference, instanced flag, instance index, and container
@@ -206,15 +235,29 @@ The application can be packaged as a Windows executable using WebView2:
     - Updates keybind in localStorage and UI display
     - Keybinds automatically reload on next key press (no restart needed)
     - Supports Escape key to cancel keybind change
-  - **Video Panel Setup** (`setupVideoPanel()`): Graphics settings configuration system
-    - Antialiasing toggle (on/off) - smooths jagged edges
-    - Bloom Effect toggle (on/off) with intensity slider (0-100%)
-    - Fog toggle (on/off) - atmospheric distance fog
-    - All settings persist to localStorage
-    - Real-time application of video settings via `applyVideoSettings()`
-    - Bloom intensity slider with draggable handle and percentage display
-    - Disabled state styling when toggles are off
-    - Settings applied to renderer, composer, and scene objects
+  - **Video Panel Setup** (`setupVideoPanel()`): Comprehensive graphics settings configuration system
+    - **Performance Presets**: Dropdown selector with Low, Mid, High, and Custom presets
+      - Low: All effects disabled for maximum performance
+      - Mid: Balanced settings with moderate bloom intensity (0.5)
+      - High: All effects enabled with high bloom intensity (0.7)
+      - Custom: Automatically selected when individual settings are modified
+    - **Render Scale**: Slider (0.1-2.0) for resolution scaling (multiplies devicePixelRatio)
+    - **Antialiasing**: Toggle for smoothing jagged edges (requires renderer recreation when changed)
+    - **Post Processing**: Master toggle that enables/disables all post-processing effects
+    - **Bloom Effect**: Toggle with three independent sliders:
+      - Intensity: 0-3.0 (controls bloom strength)
+      - Radius: 0-1.0 (controls bloom spread)
+      - Threshold: 0-1.0 (controls brightness threshold for bloom)
+      - Bloom sliders automatically disabled when bloom toggle is off
+    - **Fog**: Toggle with density slider (0-0.2, displayed x1000 for readability)
+      - Defaults to off for menu visibility
+    - **Particle Systems**: Toggles for snow and leaves particles
+    - **localStorage Persistence**: All settings saved with keys:
+      - `antialiasingEnabled`, `postProcessingEnabled`, `bloomEnabled`, `bloomIntensity`, `bloomRadius`, `bloomThreshold`
+      - `fogEnabled`, `fogDensity`, `snowEnabled`, `leavesEnabled`, `renderScale`, `performancePreset`
+    - **Real-time Application**: Settings applied immediately via `applyVideoSettings()` → `updateVideoSettings()` in main.js
+    - **Preset Auto-switch**: When individual settings change, preset automatically switches to "Custom"
+    - Settings applied to renderer (antialiasing, pixel ratio), composer (bloom), scene (fog), and particle manager (snow/leaves)
   - **Game UI Button Hiding**: `hideGameUIButtons()` function hides tech, quit, fullscreen, and show UI buttons when entering first-person mode.
   - **Pause Menu Setup** (`setupPauseMenu()`): Pause system for first-person gameplay
     - Escape key handler toggles pause (only active in first-person mode)

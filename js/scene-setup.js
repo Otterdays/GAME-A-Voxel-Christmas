@@ -6,40 +6,15 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PEAK_HEIGHT } from './config.js';
 
-function createRenderer() {
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-
-    // Apply common settings
+export function createRenderer({ antialias = true, pixelRatio = Math.min(window.devicePixelRatio, 2) } = {}) {
+    const renderer = new THREE.WebGLRenderer({ antialias });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(pixelRatio);
     renderer.toneMapping = THREE.ReinhardToneMapping;
-    document.body.appendChild(renderer.domElement);
-
     return renderer;
 }
 
-export function setupScene(SCENE_OPTS) {
-    // 1. Scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(SCENE_OPTS.bgColor);
-    scene.fog = new THREE.FogExp2(SCENE_OPTS.bgColor, 0.007);
-
-    // 2. Camera
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(75, 45, 75);
-
-    // 3. Renderer
-    const renderer = createRenderer();
-
-    // 4. Lighting
-    const ambient = new THREE.AmbientLight(0x404070, 0.6);
-    scene.add(ambient);
-
-    const moonLight = new THREE.DirectionalLight(0xaaccff, 1.2);
-    moonLight.position.set(20, 50, -20);
-    scene.add(moonLight);
-
-    // 5. Post Processing
+export function createComposer(renderer, scene, camera) {
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
 
@@ -53,6 +28,35 @@ export function setupScene(SCENE_OPTS) {
     composer.addPass(bloomPass);
 
     composer.addPass(new OutputPass());
+    return composer;
+}
+
+export function setupScene(SCENE_OPTS) {
+    // 1. Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(SCENE_OPTS.bgColor);
+    // Fog controlled by video settings panel - defaults to off for menu visibility
+    // Created dynamically via updateVideoSettings() when fog toggle is enabled
+    // scene.fog = new THREE.FogExp2(SCENE_OPTS.bgColor, 0.007);
+
+    // 2. Camera
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(75, 45, 75);
+
+    // 3. Renderer
+    const renderer = createRenderer();
+    document.body.appendChild(renderer.domElement);
+
+    // 4. Lighting
+    const ambient = new THREE.AmbientLight(0x404070, 0.6);
+    scene.add(ambient);
+
+    const moonLight = new THREE.DirectionalLight(0xaaccff, 1.2);
+    moonLight.position.set(20, 50, -20);
+    scene.add(moonLight);
+
+    // 5. Post Processing
+    const composer = createComposer(renderer, scene, camera);
 
     // 6. Controls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -60,14 +64,6 @@ export function setupScene(SCENE_OPTS) {
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.3;
     controls.target.set(0, PEAK_HEIGHT / 2, 0);
-
-    // Resize Handler
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        composer.setSize(window.innerWidth, window.innerHeight);
-    });
 
     return { scene, camera, renderer, composer, controls };
 }

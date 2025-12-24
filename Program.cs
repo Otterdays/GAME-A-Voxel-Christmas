@@ -113,6 +113,15 @@ namespace VoxelChristmas
                             // Toggle between fullscreen and windowed mode
                             ToggleFullscreen();
                         }
+                        else if (message.StartsWith("save-world:"))
+                        {
+                            string jsonData = message.Substring("save-world:".Length);
+                            SaveWorld(jsonData);
+                        }
+                        else if (message == "load-world")
+                        {
+                            LoadWorld();
+                        }
                     });
                 };
 
@@ -145,6 +154,55 @@ namespace VoxelChristmas
             {
                 MessageBox.Show($"Error initializing WebView2: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Application.Exit();
+            }
+        }
+
+        private void SaveWorld(string jsonData)
+        {
+            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+            {
+                saveFileDialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+                saveFileDialog.FilterIndex = 1;
+                saveFileDialog.RestoreDirectory = true;
+                saveFileDialog.FileName = $"world-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        File.WriteAllText(saveFileDialog.FileName, jsonData);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error saving file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void LoadWorld()
+        {
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*";
+                openFileDialog.FilterIndex = 1;
+                openFileDialog.RestoreDirectory = true;
+
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        string fileContent = File.ReadAllText(openFileDialog.FileName);
+                        // Send data back to WebView2
+                        // We need to wrap it in the structure expected by ui.js
+                        string message = "{\"type\": \"load-world-data\", \"data\": " + fileContent + "}";
+                        webView.CoreWebView2.PostWebMessageAsString(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error loading file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
             }
         }
 

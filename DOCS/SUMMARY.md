@@ -14,7 +14,17 @@ A procedural Voxel Christmas scene rendered with Three.js (WebGL) featuring an i
 - **Pause Menu**: Full pause system with Escape key, featuring Resume, Settings, and Quit to Menu options
 - **WASD Movement**: Smooth first-person movement with configurable keybinds, ground collision, and jump mechanics
 - **Configurable Keybinds**: Fully customizable keybinds with interactive UI, localStorage persistence, and visual feedback
-- **Video Settings**: Graphics options including antialiasing, bloom effect, and fog toggles with intensity controls. Performance presets (Low, Mid, High, Custom) with proper dropdown text updates.
+- **Performance Monitoring**: Real-time performance stats overlay (FPS, draw calls, triangles, memory) accessible via toggle button
+- **Video Settings**: Comprehensive graphics configuration system with:
+  - Performance presets (Low, Mid, High, Custom) for quick optimization
+  - Render scale slider (0.1-2.0) for resolution scaling
+  - Antialiasing toggle for smooth edges
+  - Post-processing master toggle (enables/disables all post-processing effects)
+  - Bloom effect toggle with three sliders: intensity (0-3.0), radius (0-1.0), threshold (0-1.0)
+  - Fog toggle with density control (0-0.2, displayed x1000)
+  - Snow and leaves particle system toggles
+  - All settings persist to localStorage and apply in real-time
+  - Preset system automatically switches to "Custom" when individual settings are modified
 - **Ambient Sound**: Procedural wind ambient sound using Tone.js (starts automatically in first-person mode)
 - **Particle Systems**: Snow and falling leaves
 - **Post-Processing**: Bloom effect for a magical look
