@@ -11,6 +11,12 @@ export function createRenderer({ antialias = true, pixelRatio = Math.min(window.
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(pixelRatio);
     renderer.toneMapping = THREE.ReinhardToneMapping;
+    
+    // PERFORMANCE OPTIMIZATIONS
+    renderer.sortObjects = true; // Enable object sorting for better batching
+    renderer.shadowMap.enabled = false; // Disable shadows if not used (saves performance)
+    renderer.physicallyCorrectLights = false; // Disable if not needed (saves calculations)
+    
     return renderer;
 }
 

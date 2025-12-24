@@ -74,23 +74,33 @@ export class ParticleManager {
     }
 
     update() {
+        // PERFORMANCE: Only update if systems exist and are enabled
+        if (!this.snowSystem && !this.leafSystem) return;
+        
         const now = Date.now();
 
         if (this.snowSystem && this.snowEnabled !== false) {
             const pos = this.snowSystem.geometry.attributes.position.array;
-            for (let i = 0; i < this.SCENE_OPTS.snowCount; i++) {
+            const snowCount = this.SCENE_OPTS.snowCount;
+            
+            // OPTIMIZED: Batch updates in single loop
+            for (let i = 0; i < snowCount; i++) {
                 const idx = i * 3;
                 pos[idx + 1] -= this.snowVelocities[i];
                 pos[idx] += Math.sin(now * 0.001 + i) * 0.01;
                 if (pos[idx + 1] < -2) pos[idx + 1] = 30;
             }
+            // Only mark needsUpdate once after all updates
             this.snowSystem.geometry.attributes.position.needsUpdate = true;
         }
 
         if (this.leafSystem && this.leavesEnabled !== false) {
             const pos = this.leafSystem.geometry.attributes.position.array;
             const spread = this.SCENE_OPTS.worldRadius * 2.2;
-            for (let i = 0; i < this.SCENE_OPTS.leafCount; i++) {
+            const leafCount = this.SCENE_OPTS.leafCount;
+            
+            // OPTIMIZED: Batch updates in single loop
+            for (let i = 0; i < leafCount; i++) {
                 const idx = i * 3;
                 const data = this.leafData[i];
                 pos[idx + 1] -= data.speedY;
@@ -103,6 +113,7 @@ export class ParticleManager {
                     pos[idx + 2] = (Math.random() - 0.5) * spread;
                 }
             }
+            // Only mark needsUpdate once after all updates
             this.leafSystem.geometry.attributes.position.needsUpdate = true;
         }
     }

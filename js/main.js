@@ -28,6 +28,12 @@ let blockHighlight = null;
 let raycaster = null;
 const RAYCAST_DISTANCE = 5; // Maximum distance to highlight blocks
 
+// Performance optimization: Cache raycast objects to avoid scene traversal every frame
+let cachedRaycastObjects = [];
+let objectsCacheDirty = true;
+let raycastFrameSkip = 0;
+const RAYCAST_INTERVAL = 2; // Check every 2 frames (30 FPS update rate is still smooth)
+
 function init() {
     // 1. Setup Scene
     const sceneObjects = setupScene(SCENE_OPTS);
@@ -47,6 +53,7 @@ function init() {
     generateTerrainInstanced(scene, SCENE_OPTS, { enableSnowEdges: false });
     generateHouse(scene);
     generateTrees(scene, SCENE_OPTS);
+    invalidateRaycastCache(); // Invalidate cache after menu world generation
 
     // 3. Particles
     particleManager = new ParticleManager(scene, SCENE_OPTS);
@@ -98,26 +105,26 @@ function initBlockHighlighting() {
     scene.add(blockHighlight);
 }
 
-// Update block highlighting (called in animate loop)
-function updateBlockHighlight() {
-    if (!isFirstPersonMode || !raycaster || !blockHighlight || !firstPersonControls || !firstPersonControls.isLocked()) {
-        blockHighlight.visible = false;
-        return;
+// Invalidate raycast cache when world changes (call after world generation)
+function invalidateRaycastCache() {
+    objectsCacheDirty = true;
+    cachedRaycastObjects = [];
+}
+
+// Get cached raycast objects (only rebuilds when cache is dirty)
+function getRaycastObjects() {
+    // Return cached list if valid
+    if (!objectsCacheDirty && cachedRaycastObjects.length > 0) {
+        return cachedRaycastObjects;
     }
     
-    // Cast ray from camera in forward direction
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    raycaster.far = RAYCAST_DISTANCE;
-    
-    // Get all meshes in the game world container (blocks)
+    // Rebuild cache
     const objectsToCheck = [];
     
     // Add game world container if it exists (prioritize game world)
     if (gameWorldContainer) {
         gameWorldContainer.traverse((child) => {
-            if (child instanceof THREE.Mesh && child.visible) {
-                objectsToCheck.push(child);
-            } else if (child instanceof THREE.InstancedMesh && child.visible) {
+            if ((child instanceof THREE.Mesh || child instanceof THREE.InstancedMesh) && child.visible) {
                 objectsToCheck.push(child);
             }
         });
@@ -128,16 +135,42 @@ function updateBlockHighlight() {
         scene.traverse((child) => {
             // Skip game world container (already checked)
             if (child === gameWorldContainer) return;
-            if (child instanceof THREE.Mesh && child.visible) {
+            if ((child instanceof THREE.Mesh || child instanceof THREE.InstancedMesh) && child.visible) {
                 // Only check blocks, not lights or other objects
-                if (child.material && !child.material.emissive) {
+                if (!child.material || !child.material.emissive) {
                     objectsToCheck.push(child);
                 }
-            } else if (child instanceof THREE.InstancedMesh && child.visible) {
-                objectsToCheck.push(child);
             }
         });
     }
+    
+    // Update cache
+    cachedRaycastObjects = objectsToCheck;
+    objectsCacheDirty = false;
+    return cachedRaycastObjects;
+}
+
+// Update block highlighting (called in animate loop)
+// OPTIMIZED: Uses cached object list and frame throttling to prevent FPS drops
+function updateBlockHighlight() {
+    if (!isFirstPersonMode || !raycaster || !blockHighlight || !firstPersonControls || !firstPersonControls.isLocked()) {
+        blockHighlight.visible = false;
+        return;
+    }
+    
+    // Throttle: only raycast every N frames (30 FPS update is still smooth for highlighting)
+    raycastFrameSkip++;
+    if (raycastFrameSkip < RAYCAST_INTERVAL) {
+        return; // Skip this frame
+    }
+    raycastFrameSkip = 0;
+    
+    // Cast ray from camera in forward direction
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    raycaster.far = RAYCAST_DISTANCE;
+    
+    // OPTIMIZED: Use cached object list instead of traversing scene every frame
+    const objectsToCheck = getRaycastObjects();
     
     // Find intersections
     const intersects = raycaster.intersectObjects(objectsToCheck, false);
@@ -226,14 +259,16 @@ function animate() {
     lastTime = currentTime;
     
     // Update appropriate controls based on mode
+    // PERFORMANCE: Only update controls for active mode to avoid unnecessary work
     if (isFirstPersonMode && firstPersonControls && !isPaused) {
         // Update movement (WASD controls) - only when not paused
         firstPersonControls.updateMovement(deltaTime);
         // PointerLockControls handles mouse movement automatically via event listeners
         
-        // Update block highlighting
+        // Update block highlighting (already optimized with caching and throttling)
         updateBlockHighlight();
-    } else if (orbitControls && !isFirstPersonMode) {
+    } else if (orbitControls && !isFirstPersonMode && orbitControls.enabled) {
+        // Only update orbit controls if enabled and in orbit mode
         orbitControls.update();
         // Hide highlight when not in first-person mode
         if (blockHighlight) {
@@ -482,6 +517,7 @@ export async function regenerateWorld(options, progressCallback = null) {
         // Clear any existing game world
         updateProgress(0, 'Initializing world generation...');
         clearWorld(gameContainer);
+        invalidateRaycastCache(); // Clear raycast cache when world is cleared
         
         // Use requestAnimationFrame to allow UI updates and smooth generation
         requestAnimationFrame(() => {
@@ -517,6 +553,9 @@ export async function regenerateWorld(options, progressCallback = null) {
                     
                     // Complete progress
                     updateProgress(100, 'World generation complete!');
+                    
+                    // Invalidate raycast cache after world generation completes
+                    invalidateRaycastCache();
                     
                     // Resolve after a brief delay for smooth transition
                     setTimeout(() => {

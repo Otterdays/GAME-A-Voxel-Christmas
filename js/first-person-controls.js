@@ -21,6 +21,16 @@ export class FirstPersonControls {
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.onGround = true;
         
+        // PERFORMANCE: Reusable Vector3 objects to avoid GC pressure (created once, reused every frame)
+        this._forward = new THREE.Vector3();
+        this._right = new THREE.Vector3();
+        this._moveVector = new THREE.Vector3();
+        this._upVector = new THREE.Vector3(0, 1, 0); // Static up vector, cached
+        
+        // PERFORMANCE: Cache ground height to avoid recalculating every frame
+        this._lastGroundHeightCheck = { x: 0, z: 0, height: 0 };
+        this._groundHeightCacheDistance = 0.5; // Only recalculate if moved more than this distance
+        
         // Load keybinds
         this.keybinds = loadKeybinds();
         
@@ -122,25 +132,26 @@ export class FirstPersonControls {
     }
     
     // Update movement based on current key states
+    // OPTIMIZED: Reuses Vector3 objects to avoid GC pressure
     updateMovement(deltaTime) {
         if (!this.controls.isLocked) return;
         
-        // Calculate movement direction based on camera rotation
-        const direction = new THREE.Vector3();
-        const forward = new THREE.Vector3();
-        const right = new THREE.Vector3();
+        // Reuse cached Vector3 objects instead of creating new ones every frame
+        const forward = this._forward;
+        const right = this._right;
+        const moveVector = this._moveVector;
         
         // Get forward direction (camera's local Z axis, negated)
         this.camera.getWorldDirection(forward);
         forward.y = 0; // Keep movement horizontal
         forward.normalize();
         
-        // Get right direction (cross product of forward and up)
-        right.crossVectors(forward, new THREE.Vector3(0, 1, 0));
+        // Get right direction (cross product of forward and up) - reuse cached up vector
+        right.crossVectors(forward, this._upVector);
         right.normalize();
         
-        // Calculate movement vector
-        const moveVector = new THREE.Vector3(0, 0, 0);
+        // Reset and calculate movement vector
+        moveVector.set(0, 0, 0);
         
         if (this.keys.forward) {
             moveVector.add(forward);
@@ -174,14 +185,29 @@ export class FirstPersonControls {
         // Update vertical position
         this.camera.position.y += this.velocity.y * deltaTime;
         
-        // Ground collision
+        // Ground collision - OPTIMIZED: Cache ground height to avoid recalculating every frame
         if (this.getGroundHeight && this.sceneOpts) {
-            const groundHeight = this.getGroundHeight(
-                this.camera.position.x,
-                this.camera.position.z,
-                this.sceneOpts,
-                true // useGameHeight
-            );
+            const dx = this.camera.position.x - this._lastGroundHeightCheck.x;
+            const dz = this.camera.position.z - this._lastGroundHeightCheck.z;
+            const distMoved = Math.sqrt(dx * dx + dz * dz);
+            
+            let groundHeight;
+            // Only recalculate ground height if moved more than cache distance, or if falling (need accurate check)
+            if (distMoved > this._groundHeightCacheDistance || this.velocity.y < 0) {
+                groundHeight = this.getGroundHeight(
+                    this.camera.position.x,
+                    this.camera.position.z,
+                    this.sceneOpts,
+                    true // useGameHeight
+                );
+                // Update cache
+                this._lastGroundHeightCheck.x = this.camera.position.x;
+                this._lastGroundHeightCheck.z = this.camera.position.z;
+                this._lastGroundHeightCheck.height = groundHeight;
+            } else {
+                // Use cached height
+                groundHeight = this._lastGroundHeightCheck.height;
+            }
             
             const targetY = groundHeight + this.eyeHeight;
             
