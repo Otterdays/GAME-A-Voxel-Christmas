@@ -129,17 +129,20 @@ function buildGameHeightmap(opts, hillsEnabled) {
     const p3 = random() * Math.PI * 2;
 
     const extraHills = [];
-    const extraCount = 5 + Math.floor(random() * 4);
+    const extraCount = 6 + Math.floor(random() * 4);
     for (let i = 0; i < extraCount; i++) {
-        const hx = min + 40 + Math.floor(random() * (size - 80));
-        const hz = min + 40 + Math.floor(random() * (size - 80));
-        if (Math.hypot(hx, hz) < hillR + 24) continue;
-        extraHills.push({
-            x: hx,
-            z: hz,
-            r: 16 + random() * 32,
-            h: 3 + random() * 7
-        });
+        for (let attempt = 0; attempt < 16; attempt++) {
+            const hx = min + 40 + Math.floor(random() * (size - 80));
+            const hz = min + 40 + Math.floor(random() * (size - 80));
+            if (Math.hypot(hx, hz) < hillR + 28) continue;
+            extraHills.push({
+                x: hx,
+                z: hz,
+                r: 18 + random() * 36,
+                h: 5 + random() * 8
+            });
+            break;
+        }
     }
 
     for (let z = min; z <= max; z++) {
@@ -161,8 +164,8 @@ function buildGameHeightmap(opts, hillsEnabled) {
                 const rolling = wave1 * wave2 + wave3 * 0.5;
                 const ridge = Math.sin(x * 0.018 + p2) * Math.cos(z * 0.022 + p1);
                 const mound = Math.sin(x * 0.011 + p3) * Math.sin(z * 0.013 + p1);
-                let outer = Math.max(0, rolling * 1.2 + ridge * 2.2 + mound * 2.8);
-                if (rolling > 0.65) outer += 1;
+                let outer = Math.max(0, rolling * 1.6 + ridge * 3.0 + mound * 3.6);
+                if (rolling > 0.55) outer += 1;
 
                 for (const hill of extraHills) {
                     const d = Math.hypot(x - hill.x, z - hill.z);
@@ -192,11 +195,13 @@ function buildGameHeightmap(opts, hillsEnabled) {
     });
 }
 
-async function addInstancedPacked(container, material, packed, count, dummy, blockType, register = false, onProgress = null) {
+async function addInstancedPacked(container, material, packed, count, dummy, blockType, register = false, enableEdges = true) {
     if (count <= 0) return [];
     const mesh = new THREE.InstancedMesh(geometryBox, material, count);
-    const edgeMesh = new THREE.InstancedMesh(edgeGeometry, edgeMaterial, count);
-    edgeMesh.renderOrder = 1;
+    const edgeMesh = enableEdges
+        ? new THREE.InstancedMesh(edgeGeometry, edgeMaterial, count)
+        : null;
+    if (edgeMesh) edgeMesh.renderOrder = 1;
     for (let idx = 0; idx < count; idx++) {
         const o = idx * 3;
         dummy.position.set(packed[o], packed[o + 1], packed[o + 2]);
@@ -204,23 +209,25 @@ async function addInstancedPacked(container, material, packed, count, dummy, blo
         dummy.rotation.set(0, 0, 0);
         dummy.updateMatrix();
         mesh.setMatrixAt(idx, dummy.matrix);
-        edgeMesh.setMatrixAt(idx, dummy.matrix);
+        if (edgeMesh) edgeMesh.setMatrixAt(idx, dummy.matrix);
         if (register) {
             registerBlock(packed[o], packed[o + 1], packed[o + 2], blockType, mesh, true, idx, container);
         }
         if (idx > 0 && idx % 40000 === 0) {
-            if (onProgress) onProgress(idx / count);
             await nextFrame();
         }
     }
     mesh.computeBoundingSphere();
-    edgeMesh.computeBoundingSphere();
     container.add(mesh);
-    container.add(edgeMesh);
-    return [mesh, edgeMesh];
+    if (edgeMesh) {
+        edgeMesh.computeBoundingSphere();
+        container.add(edgeMesh);
+        return [mesh, edgeMesh];
+    }
+    return [mesh];
 }
 
-function addInstancedLayer(container, material, positions, blockType, dummy, register = false) {
+function addInstancedLayer(container, material, positions, blockType, dummy, register = false, enableEdges = true) {
     if (positions.length === 0) return [];
     const packed = new Int16Array(positions.length * 3);
     positions.forEach(([x, y, z], idx) => {
@@ -228,7 +235,7 @@ function addInstancedLayer(container, material, positions, blockType, dummy, reg
         packed[idx * 3 + 1] = y;
         packed[idx * 3 + 2] = z;
     });
-    return addInstancedPacked(container, material, packed, positions.length, dummy, blockType, register);
+    return addInstancedPacked(container, material, packed, positions.length, dummy, blockType, register, enableEdges);
 }
 
 async function generateGameTerrain(container, opts, options = {}, onProgress = null) {
@@ -259,12 +266,12 @@ async function generateGameTerrain(container, opts, options = {}, onProgress = n
         }
     }
 
-    await addInstancedPacked(container, mats.snowBlock, snow, count, dummy, 'snow', false);
+    await addInstancedPacked(container, mats.snowBlock, snow, count, dummy, 'snow', false, true);
     if (onProgress) {
         onProgress(0.7);
         await nextFrame();
     }
-    await addInstancedPacked(container, mats.dirt, dirt, count, dummy, 'dirt', false);
+    await addInstancedPacked(container, mats.dirt, dirt, count, dummy, 'dirt', false, false);
     if (onProgress) onProgress(1);
 }
 
