@@ -24,6 +24,7 @@ export function showLoadingScreen() {
     const panels = document.querySelectorAll('#world-gen-panel, #settings-panel, #tech-info-panel, #pause-menu');
     const countdownTimer = document.getElementById('countdown-timer');
     const techPanel = document.getElementById('tech-info-panel');
+    const minimap = document.getElementById('minimap');
     
     // Hide title screen COMPLETELY
     if (titleScreen) {
@@ -99,6 +100,11 @@ export function showLoadingScreen() {
     if (countdownTimer) {
         countdownTimer.style.setProperty('display', 'none', 'important');
         countdownTimer.style.setProperty('visibility', 'hidden', 'important');
+    }
+
+    if (minimap) {
+        minimap.classList.remove('minimap-visible');
+        minimap.classList.add('minimap-hidden');
     }
     
     // Reset progress

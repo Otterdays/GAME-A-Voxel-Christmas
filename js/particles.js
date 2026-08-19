@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 
 export class ParticleManager {
-    constructor(scene, SCENE_OPTS) {
-        this.scene = scene;
+    constructor(container, SCENE_OPTS, { follow = false } = {}) {
+        this.container = container;
         this.SCENE_OPTS = SCENE_OPTS;
+        this.follow = follow;
         this.snowSystem = null;
         this.snowVelocities = [];
         this.leafSystem = null;
         this.leafData = [];
         this.snowEnabled = true;
         this.leavesEnabled = true;
+        this.localSpread = follow ? 70 : SCENE_OPTS.worldRadius * 2.5;
 
         this.initSnow();
         this.initLeaves();
@@ -19,7 +21,7 @@ export class ParticleManager {
         const geo = new THREE.BufferGeometry();
         const positions = [];
         this.snowVelocities = [];
-        const spread = this.SCENE_OPTS.worldRadius * 2.5;
+        const spread = this.localSpread;
 
         for (let i = 0; i < this.SCENE_OPTS.snowCount; i++) {
             positions.push(
@@ -34,7 +36,7 @@ export class ParticleManager {
             color: 0xeeeeee, size: 0.25, transparent: true, opacity: 0.8
         });
         this.snowSystem = new THREE.Points(geo, mat);
-        this.scene.add(this.snowSystem);
+        this.container.add(this.snowSystem);
     }
 
     initLeaves() {
@@ -46,8 +48,7 @@ export class ParticleManager {
             new THREE.Color(0xd6562b), new THREE.Color(0xe0a83c),
             new THREE.Color(0x8f5e30), new THREE.Color(0xbf2a2a)
         ];
-
-        const spread = this.SCENE_OPTS.worldRadius * 2.2;
+        const spread = this.follow ? this.localSpread : this.SCENE_OPTS.worldRadius * 2.2;
 
         for (let i = 0; i < this.SCENE_OPTS.leafCount; i++) {
             positions.push(
@@ -70,36 +71,39 @@ export class ParticleManager {
             size: 0.4, vertexColors: true, transparent: true, opacity: 0.9, sizeAttenuation: true
         });
         this.leafSystem = new THREE.Points(geo, mat);
-        this.scene.add(this.leafSystem);
+        this.container.add(this.leafSystem);
     }
 
-    update() {
-        // PERFORMANCE: Only update if systems exist and are enabled
+    update(followTarget = null) {
         if (!this.snowSystem && !this.leafSystem) return;
-        
+
         const now = Date.now();
+        const origin = this.follow && followTarget ? followTarget.position : null;
+        const respawnY = origin ? origin.y + 22 : 30;
+        const floorY = origin ? origin.y - 8 : -2;
 
         if (this.snowSystem && this.snowEnabled !== false) {
             const pos = this.snowSystem.geometry.attributes.position.array;
             const snowCount = this.SCENE_OPTS.snowCount;
-            
-            // OPTIMIZED: Batch updates in single loop
             for (let i = 0; i < snowCount; i++) {
                 const idx = i * 3;
                 pos[idx + 1] -= this.snowVelocities[i];
                 pos[idx] += Math.sin(now * 0.001 + i) * 0.01;
-                if (pos[idx + 1] < -2) pos[idx + 1] = 30;
+                if (pos[idx + 1] < floorY) {
+                    pos[idx + 1] = respawnY;
+                    if (origin) {
+                        pos[idx] = origin.x + (Math.random() - 0.5) * this.localSpread;
+                        pos[idx + 2] = origin.z + (Math.random() - 0.5) * this.localSpread;
+                    }
+                }
             }
-            // Only mark needsUpdate once after all updates
             this.snowSystem.geometry.attributes.position.needsUpdate = true;
         }
 
         if (this.leafSystem && this.leavesEnabled !== false) {
             const pos = this.leafSystem.geometry.attributes.position.array;
-            const spread = this.SCENE_OPTS.worldRadius * 2.2;
+            const spread = this.follow ? this.localSpread : this.SCENE_OPTS.worldRadius * 2.2;
             const leafCount = this.SCENE_OPTS.leafCount;
-            
-            // OPTIMIZED: Batch updates in single loop
             for (let i = 0; i < leafCount; i++) {
                 const idx = i * 3;
                 const data = this.leafData[i];
@@ -107,28 +111,34 @@ export class ParticleManager {
                 pos[idx] += Math.sin(now * data.swayFreq + data.phase) * data.swayAmp;
                 pos[idx + 2] += Math.cos(now * data.swayFreq + data.phase) * data.swayAmp;
 
-                if (pos[idx + 1] < 0) {
-                    pos[idx + 1] = 15 + Math.random() * 5;
-                    pos[idx] = (Math.random() - 0.5) * spread;
-                    pos[idx + 2] = (Math.random() - 0.5) * spread;
+                if (pos[idx + 1] < (origin ? origin.y - 4 : 0)) {
+                    pos[idx + 1] = (origin ? origin.y + 12 : 15) + Math.random() * 5;
+                    pos[idx] = (origin ? origin.x : 0) + (Math.random() - 0.5) * spread;
+                    pos[idx + 2] = (origin ? origin.z : 0) + (Math.random() - 0.5) * spread;
                 }
             }
-            // Only mark needsUpdate once after all updates
             this.leafSystem.geometry.attributes.position.needsUpdate = true;
         }
     }
 
     setSnowEnabled(enabled) {
         this.snowEnabled = enabled;
-        if (this.snowSystem) {
-            this.snowSystem.visible = enabled;
-        }
+        if (this.snowSystem) this.snowSystem.visible = enabled;
     }
 
     setLeavesEnabled(enabled) {
         this.leavesEnabled = enabled;
-        if (this.leafSystem) {
-            this.leafSystem.visible = enabled;
-        }
+        if (this.leafSystem) this.leafSystem.visible = enabled;
+    }
+
+    dispose() {
+        [this.snowSystem, this.leafSystem].forEach((sys) => {
+            if (!sys) return;
+            if (sys.parent) sys.parent.remove(sys);
+            if (sys.geometry) sys.geometry.dispose();
+            if (sys.material) sys.material.dispose();
+        });
+        this.snowSystem = null;
+        this.leafSystem = null;
     }
 }

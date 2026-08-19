@@ -46,7 +46,7 @@ export function setupScene(SCENE_OPTS) {
     // scene.fog = new THREE.FogExp2(SCENE_OPTS.bgColor, 0.007);
 
     // 2. Camera
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
     camera.position.set(75, 45, 75);
 
     // 3. Renderer

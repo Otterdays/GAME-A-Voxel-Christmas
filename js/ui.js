@@ -1,5 +1,6 @@
 // Import THREE for fog control
 import * as THREE from 'three';
+import { GAME_WORLD_SIZE } from './config.js';
 
 // Import ambient sound functions (will be loaded when needed)
 let ambientSoundModule = null;
@@ -929,7 +930,7 @@ function updateBloomSliderState() {
 // Maps UI settings to updateVideoSettings() parameters for real-time application
 function applyVideoSettings(settings) {
     // Import scene objects dynamically - avoids circular dependencies
-    import('./main.js').then(({ updateVideoSettings, particleManager }) => {
+    import('./main.js').then(({ updateVideoSettings, setParticleToggles }) => {
         updateVideoSettings({
             antialiasing: settings.antialiasing,
             pixelRatio: settings.renderScale,
@@ -942,9 +943,8 @@ function applyVideoSettings(settings) {
             fogDensity: settings.fogDensity
         });
 
-        if (particleManager) {
-            if (settings.snowEnabled !== undefined) particleManager.setSnowEnabled(settings.snowEnabled);
-            if (settings.leavesEnabled !== undefined) particleManager.setLeavesEnabled(settings.leavesEnabled);
+        if (settings.snowEnabled !== undefined || settings.leavesEnabled !== undefined) {
+            setParticleToggles(settings.snowEnabled, settings.leavesEnabled);
         }
     }).catch(err => console.warn('Could not apply video settings:', err));
 }
@@ -1041,10 +1041,15 @@ export function setupWorldGenPanel() {
     const playBtn = document.getElementById('play-btn');
     const worldGenPanel = document.getElementById('world-gen-panel');
     const closeBtn = document.getElementById('close-world-gen');
+    const worldSizeValue = document.getElementById('world-size-value');
 
     if (!playBtn || !worldGenPanel) {
         console.warn('World gen panel elements not found');
         return;
+    }
+
+    if (worldSizeValue) {
+        worldSizeValue.textContent = `${GAME_WORLD_SIZE} × ${GAME_WORLD_SIZE}`;
     }
 
     // Initialize panel as hidden
