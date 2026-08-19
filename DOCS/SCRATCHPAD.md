@@ -1,5 +1,21 @@
 # Scratchpad
 
+## 2026-08-19: Separate worlds, 500-block gen, trees, minimap
+
+### Problem
+Menu preview, sky/particles, and the play scene were the same Three.js scene. Menu voxels used shared geometry that `clearWorld()` disposed, so generating a play world could wreck the menu. Play worlds were just a scaled copy of the menu island (UI even said 64×64).
+
+### What changed
+- Menu world is a `MenuWorld` group; play world is a `GameWorld` group. Only one is visible at a time.
+- `clearWorld()` skips shared voxel geometries/materials.
+- Play worlds are 500×500 with a baked heightmap (village plateau + rolling snow + extra hills), a 3-block ice/stone border, and forest tree placement.
+- Trees use shape profiles and decoration kits (lights, bulbs, toppers).
+- Circular minimap, top-right, player-centered, rotates so the player marker stays up.
+
+### Next
+- Tune gen performance if 500×500 hitch is too long on low-end GPUs.
+- Optional chunked terrain meshes if draw cost is high.
+
 ## 2025-01-XX: Optimized: Tree Generation with InstancedMesh
 
 ### Previous Implementation

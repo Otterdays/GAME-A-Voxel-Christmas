@@ -128,7 +128,8 @@
                 <div class="world-gen-status">
                     <div class="status-item">
                         <span class="status-label">World Size:</span>
-                        <span class="status-value">64 x 64</span>
+                        <span class="status-value" id="world-size-value">500 × 500</span>
+                        <span class="status-hint">blocks across</span>
                     </div>
                 </div>
                 <div class="world-gen-toggles">
@@ -524,6 +525,12 @@
         <div class="crosshair-line crosshair-vertical"></div>
     </div>
 
+    <!-- Circular player-centered minimap (shown in first-person) -->
+    <div id="minimap" class="minimap minimap-hidden">
+        <canvas id="minimap-canvas" width="196" height="196"></canvas>
+        <div class="minimap-size-label">500 × 500</div>
+    </div>
+
     <!-- Pause Menu -->
     <div id="pause-menu" class="pause-menu-hidden">
         <div class="pause-menu-content">
@@ -544,10 +551,10 @@
     <button id="quit-btn" class="ui-btn">✕ Quit</button>
 
     <!-- Performance Stats -->
-    <button id="toggle-stats" style="position: fixed; top: 10px; right: 10px; padding: 5px 10px; z-index: 10001; background: #333; color: #0f0; border: 1px solid #0f0; cursor: pointer;">
+    <button id="toggle-stats" class="stats-toggle-btn">
         📊 Stats
     </button>
-    <div id="perf-stats" style="position: fixed; top: 45px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; z-index: 10000; display: none;">
+    <div id="perf-stats" class="perf-stats-panel">
         <div>FPS: <span id="fps-value">60</span></div>
         <div>Draw Calls: <span id="draw-calls">0</span></div>
         <div>Triangles: <span id="triangles">0</span></div>

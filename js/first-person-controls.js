@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { loadKeybinds } from './config.js';
+import { getPlayableBounds } from './heightmap.js';
 
 export class FirstPersonControls {
     constructor(camera, domElement, getGroundHeightCallback = null, sceneOpts = null) {
@@ -172,8 +173,11 @@ export class FirstPersonControls {
             moveVector.multiplyScalar(this.moveSpeed * deltaTime);
         }
         
-        // Apply horizontal movement
+        // Apply horizontal movement, then keep the player inside the world border
         this.camera.position.add(moveVector);
+        const bounds = getPlayableBounds();
+        this.camera.position.x = Math.max(bounds.minX, Math.min(bounds.maxX, this.camera.position.x));
+        this.camera.position.z = Math.max(bounds.minZ, Math.min(bounds.maxZ, this.camera.position.z));
         
         // Apply gravity and vertical movement
         if (!this.onGround) {

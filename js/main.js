@@ -1,9 +1,10 @@
 import { SCENE_OPTS, GAME_WORLD_OPTS, PEAK_HEIGHT } from './config.js';
 import { setupScene, createRenderer, createComposer } from './scene-setup.js';
-import { generateTerrainInstanced, generateHouse, generateTrees, clearWorld, getGroundHeight, setSeed } from './world-gen.js';
+import { generateTerrainInstanced, generateHouse, generateTrees, clearWorld, getGroundHeight, generateGameWorld } from './world-gen.js';
 import { ParticleManager } from './particles.js';
 import { FirstPersonControls } from './first-person-controls.js';
 import { initAmbientSound, startAmbientSound, stopAmbientSound, setAmbientVolume } from './ambient-sound.js';
+import { MiniMap, getPlayerYaw } from './minimap.js';
 import * as THREE from 'three';
 
 let scene, camera, renderer, composer, orbitControls, firstPersonControls;
@@ -11,8 +12,11 @@ let particleManager;
 let isFirstPersonMode = false;
 let isPaused = false; // Pause state
 let isHandlingPause = false; // Flag to prevent double-handling of pause requests
-let gameWorldContainer = null; // Separate container for game world
-let menuWorldObjects = []; // Track menu world objects to keep them separate
+let gameWorldContainer = null;
+let menuWorldContainer = null;
+let gameParticleManager = null;
+let miniMap = null;
+const _minimapForward = new THREE.Vector3();
 let lastTime = performance.now(); // For deltaTime calculation
 // Master toggle for post-processing - when false, uses direct renderer instead of composer
 // Controlled by video settings panel, affects whether post-processing pipeline is used in animation loop
@@ -47,16 +51,17 @@ function init() {
     const canvas = renderer.domElement;
     canvas.style.display = 'none'; // Hidden until splash dismissed
 
-    // 2. Generate Menu World (happens in background while splash is visible)
-    // Generate menu world directly in scene (not in a container)
-    // Disable snow edges for menu to prevent flickering
-    generateTerrainInstanced(scene, SCENE_OPTS, { enableSnowEdges: false });
-    generateHouse(scene);
-    generateTrees(scene, SCENE_OPTS);
-    invalidateRaycastCache(); // Invalidate cache after menu world generation
+    // 2. Generate Menu World in its own group so play worlds never share objects
+    menuWorldContainer = new THREE.Group();
+    menuWorldContainer.name = 'MenuWorld';
+    scene.add(menuWorldContainer);
+    generateTerrainInstanced(menuWorldContainer, SCENE_OPTS, { enableSnowEdges: false });
+    generateHouse(menuWorldContainer);
+    generateTrees(menuWorldContainer, SCENE_OPTS);
+    invalidateRaycastCache();
 
-    // 3. Particles
-    particleManager = new ParticleManager(scene, SCENE_OPTS);
+    // 3. Particles belong to the menu world until a game world is created
+    particleManager = new ParticleManager(menuWorldContainer, SCENE_OPTS);
     
     // Apply saved particle settings
     const snowEnabled = localStorage.getItem('snowEnabled') !== 'false';
@@ -67,10 +72,17 @@ function init() {
     // 4. Initialize block highlighting system
     initBlockHighlighting();
 
-    // 5. Start Background Music
+    // 5. Minimap overlay (hidden until a play world is entered)
+    const minimapRoot = document.getElementById('minimap');
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    if (minimapRoot && minimapCanvas) {
+        miniMap = new MiniMap(minimapRoot, minimapCanvas);
+    }
+
+    // 6. Start Background Music
     setupBackgroundMusic();
 
-    // 6. Hide Loading
+    // 7. Hide Loading
     const loading = document.getElementById('loading');
     if (loading) {
         loading.style.opacity = '0';
@@ -279,8 +291,14 @@ function animate() {
         blockHighlight.visible = false;
     }
 
-    if (particleManager) {
+    if (isFirstPersonMode && gameParticleManager) {
+        gameParticleManager.update(camera);
+    } else if (particleManager && !isFirstPersonMode) {
         particleManager.update();
+    }
+
+    if (isFirstPersonMode && miniMap && camera) {
+        miniMap.update(camera.position.x, camera.position.z, getPlayerYaw(camera, _minimapForward));
     }
 
     // Performance monitoring (reuse currentTime from deltaTime calculation above)
@@ -491,80 +509,71 @@ function getGameWorldContainer() {
     if (!gameWorldContainer) {
         gameWorldContainer = new THREE.Group();
         gameWorldContainer.name = 'GameWorld';
+        gameWorldContainer.visible = false;
         scene.add(gameWorldContainer);
     }
     return gameWorldContainer;
 }
 
-// Regenerate world based on options (creates separate game world)
+function setMenuWorldVisible(visible) {
+    if (menuWorldContainer) menuWorldContainer.visible = visible;
+}
+
+function applyParticleSettingsTo(manager) {
+    if (!manager) return;
+    const snowEnabled = localStorage.getItem('snowEnabled') !== 'false';
+    const leavesEnabled = localStorage.getItem('leavesEnabled') !== 'false';
+    manager.setSnowEnabled(snowEnabled);
+    manager.setLeavesEnabled(leavesEnabled);
+}
+
+export function setParticleToggles(snowEnabled, leavesEnabled) {
+    if (particleManager) {
+        if (snowEnabled !== undefined) particleManager.setSnowEnabled(snowEnabled);
+        if (leavesEnabled !== undefined) particleManager.setLeavesEnabled(leavesEnabled);
+    }
+    if (gameParticleManager) {
+        if (snowEnabled !== undefined) gameParticleManager.setSnowEnabled(snowEnabled);
+        if (leavesEnabled !== undefined) gameParticleManager.setLeavesEnabled(leavesEnabled);
+    }
+}
+
 export async function regenerateWorld(options, progressCallback = null) {
-    return new Promise((resolve) => {
-        // Helper function to safely call progress callback
-        const updateProgress = (percentage, statusText) => {
-            if (progressCallback && typeof progressCallback === 'function') {
-                progressCallback(percentage, statusText);
-            }
-        };
-        
-        // Get or create game world container
-        const gameContainer = getGameWorldContainer();
-        
-        // Set seed for generation if provided
-        if (options.seed !== undefined) {
-            setSeed(options.seed);
+    const gameContainer = getGameWorldContainer();
+    setMenuWorldVisible(false);
+    gameContainer.visible = true;
+
+    try {
+        if (gameParticleManager) {
+            gameParticleManager.dispose();
+            gameParticleManager = null;
         }
-        
-        // Clear any existing game world
-        updateProgress(0, 'Initializing world generation...');
         clearWorld(gameContainer);
-        invalidateRaycastCache(); // Clear raycast cache when world is cleared
-        
-        // Use requestAnimationFrame to allow UI updates and smooth generation
-        requestAnimationFrame(() => {
-            // Generate terrain (0-30%)
-            updateProgress(10, 'Generating terrain...');
-            generateTerrainInstanced(gameContainer, GAME_WORLD_OPTS, { 
-                hills: options.hills,
-                useGameHeight: true 
-            });
-            updateProgress(30, 'Terrain generated');
-            
-            requestAnimationFrame(() => {
-                // Generate house (30-60%)
-                updateProgress(40, 'Building structures...');
-                generateHouse(gameContainer, { 
-                    house: options.house,
-                    useGameHeight: true 
-                });
-                updateProgress(60, 'Structures complete');
-                
-                requestAnimationFrame(() => {
-                    // Generate trees (60-90%)
-                    updateProgress(70, 'Placing trees and decorations...');
-                    generateTrees(gameContainer, GAME_WORLD_OPTS, { 
-                        trees: options.trees, 
-                        lights: options.lights 
-                    });
-                    updateProgress(90, 'Decorations complete');
-                    
-                    // Calculate and return ground height at center
-                    updateProgress(95, 'Finalizing world...');
-                    const groundHeight = getGroundHeight(0, 0, GAME_WORLD_OPTS, true);
-                    
-                    // Complete progress
-                    updateProgress(100, 'World generation complete!');
-                    
-                    // Invalidate raycast cache after world generation completes
-                    invalidateRaycastCache();
-                    
-                    // Resolve after a brief delay for smooth transition
-                    setTimeout(() => {
-                        resolve(groundHeight);
-                    }, 300);
-                });
-            });
-        });
-    });
+        invalidateRaycastCache();
+
+        const groundHeight = await generateGameWorld(
+            gameContainer,
+            GAME_WORLD_OPTS,
+            options,
+            progressCallback
+        );
+
+        gameParticleManager = new ParticleManager(gameContainer, GAME_WORLD_OPTS, { follow: true });
+        applyParticleSettingsTo(gameParticleManager);
+
+        if (miniMap) {
+            miniMap.build();
+        }
+
+        invalidateRaycastCache();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        return groundHeight;
+    } catch (err) {
+        setMenuWorldVisible(true);
+        gameContainer.visible = false;
+        if (miniMap) miniMap.setVisible(false);
+        throw err;
+    }
 }
 
 // Enter first-person mode
@@ -630,10 +639,12 @@ export function enterFirstPersonMode(spawnY) {
         firstPersonControls.reloadKeybinds();
     }
     
-    // Show game world container (hide menu world by making game world visible)
+    // Show play world only — menu preview stays hidden so the two scenes stay separate
+    setMenuWorldVisible(false);
     if (gameWorldContainer) {
         gameWorldContainer.visible = true;
     }
+    if (miniMap) miniMap.setVisible(true);
     
     // Position camera at spawn location (ground level + eye height)
     const eyeHeight = 1.6; // Standard player eye height
@@ -725,10 +736,12 @@ export function exitFirstPersonMode() {
         }
     }
     
-    // Hide game world container (so only menu world is visible)
+    // Hide play world and restore the independent menu preview
     if (gameWorldContainer) {
         gameWorldContainer.visible = false;
     }
+    setMenuWorldVisible(true);
+    if (miniMap) miniMap.setVisible(false);
     
     // Reset camera to menu view position
     if (camera) {

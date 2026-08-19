@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Added
+- **Play World Generation (500 × 500)**: Seeded heightmap world with a central village hill, rolling snowfields, extra hills, and a stone/ice/snow border wall. World size is shown in the generation panel and on the minimap.
+- **Rotating Circular Minimap**: Top-right HUD with the player centered and kept pointing up; the map spins with look direction.
+- **Christmas Tree Decor System**: Profile-based tree shapes plus kits of lights, hanging bulbs, and toppers (star / snowflake / spire).
+
+### Changed
+- **Menu and Play Worlds Are Separate**: Menu preview lives in its own group. Entering a world hides the menu scene; quitting restores it. Shared voxel geometry/materials are no longer disposed when clearing a play world.
+- **Stats Overlay**: Moved to the top-left so it does not cover the minimap.
+
+### Added
 - **Performance Monitoring System**:
   - Visual performance stats overlay (FPS, draw calls, triangles, memory)
   - Toggle button in top-right corner (📊 Stats)

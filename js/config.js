@@ -1,28 +1,34 @@
 export const SCENE_OPTS = {
     bgColor: 0x020205,
-    snowCount: 3000,      
-    leafCount: 1200,      
-    worldRadius: 75,      
-    hillRadius: 14,       
-    plateauRadius: 5,     
-    treeCount: 140        
+    snowCount: 3000,
+    leafCount: 1200,
+    worldRadius: 75,
+    hillRadius: 14,
+    plateauRadius: 5,
+    treeCount: 140
 };
 
-// Game world options (larger world for gameplay)
+export const GAME_WORLD_SIZE = 500;
+
 export const GAME_WORLD_OPTS = {
     bgColor: 0x020205,
-    snowCount: 6000,      // More particles for larger world
-    leafCount: 2400,      // More leaves for more trees
-    worldRadius: 150,     // 2x larger world
-    hillRadius: 28,       // Scaled proportionally
-    plateauRadius: 10,    // Scaled proportionally
-    treeCount: 400        // More trees for larger world
+    snowCount: 5000,
+    leafCount: 1800,
+    worldSize: GAME_WORLD_SIZE,
+    worldMin: -Math.floor(GAME_WORLD_SIZE / 2),
+    worldMax: Math.floor(GAME_WORLD_SIZE / 2) - 1,
+    worldRadius: GAME_WORLD_SIZE / 2,
+    hillRadius: 18,
+    plateauRadius: 6,
+    treeCount: 750,
+    borderWidth: 3,
+    borderHeight: 10,
+    peakHeight: 12
 };
 
 export const PEAK_HEIGHT = Math.round(SCENE_OPTS.hillRadius * 0.7);
-export const GAME_PEAK_HEIGHT = Math.round(GAME_WORLD_OPTS.hillRadius * 0.7);
+export const GAME_PEAK_HEIGHT = GAME_WORLD_OPTS.peakHeight;
 
-// Default keybind mappings
 export const DEFAULT_KEYBINDS = {
     forward: 'KeyW',
     backward: 'KeyS',
@@ -31,7 +37,6 @@ export const DEFAULT_KEYBINDS = {
     jump: 'Space'
 };
 
-// Key display name mapping (for UI display)
 const KEY_DISPLAY_NAMES = {
     'KeyW': 'W',
     'KeyA': 'A',
@@ -63,13 +68,11 @@ const KEY_DISPLAY_NAMES = {
     'ArrowRight': '→'
 };
 
-// Load keybinds from localStorage or return defaults
 export function loadKeybinds() {
     try {
         const stored = localStorage.getItem('keybinds');
         if (stored) {
             const parsed = JSON.parse(stored);
-            // Merge with defaults to ensure all keys exist
             return { ...DEFAULT_KEYBINDS, ...parsed };
         }
     } catch (e) {
@@ -78,7 +81,6 @@ export function loadKeybinds() {
     return { ...DEFAULT_KEYBINDS };
 }
 
-// Save keybinds to localStorage
 export function saveKeybinds(keybinds) {
     try {
         localStorage.setItem('keybinds', JSON.stringify(keybinds));
@@ -87,12 +89,10 @@ export function saveKeybinds(keybinds) {
     }
 }
 
-// Get display name for a key code
 export function getKeyDisplayName(keyCode) {
     return KEY_DISPLAY_NAMES[keyCode] || keyCode.replace('Key', '').replace('Arrow', '');
 }
 
-// Get keybind for a specific action
 export function getKeybind(action) {
     const keybinds = loadKeybinds();
     return keybinds[action] || DEFAULT_KEYBINDS[action];

@@ -3,6 +3,8 @@
 ## Overview
 A procedural Voxel Christmas scene rendered with Three.js (WebGL) featuring an interactive UI with world generation controls and technology information display.
 
+[AMENDED 2026-08-19]: Play worlds are now generated as a separate 500×500 heightmap map with a world border and circular minimap. The main menu preview is an independent scene group and is hidden while playing.
+
 ## Key Features
 - **Dual World System**: Separate menu world and game world that coexist independently
 - **Procedural Terrain**: Instanced mesh rendering for performance
@@ -46,7 +48,7 @@ A procedural Voxel Christmas scene rendered with Three.js (WebGL) featuring an i
   - **Plants Tab**: Christmas Tree
   - Sleek card-based grid layout with hover animations
   - Tabbed interface matching Settings panel design
-- **World Generation Panel**: Accessible via Play button, displays world size (64x64) and toggle switches for trees, lights, house, and hills.
+- **World Generation Panel**: Accessible via Play button, displays world size (500×500 blocks) and toggle switches for trees, lights, house, and hills.
 - **World Loading Screen**: Full-screen loading overlay (z-index: 9999) with fully opaque background that completely blocks menu and game world view. Features:
   - Animated progress bar with shimmer effect and real-time percentage display (0-100%)
   - Dynamic status messages: "Generating terrain...", "Building structures...", "Placing trees...", "Entering world..."
@@ -54,7 +56,7 @@ A procedural Voxel Christmas scene rendered with Three.js (WebGL) featuring an i
   - Automatically hides ALL UI elements when shown (title, menu, buttons, news reel, panels)
   - Smooth fade-in/fade-out transitions
   - Progress tracking integrated with world generation callback system
-- **Dual World System**: Separate menu world (75 block radius) and game world (150 block radius) that coexist independently.
+- **Dual World System**: Separate menu world (75 block radius) and game world (500×500 blocks with border) that coexist independently.
 - **News Reel**: Pill-shaped banner with multiple animated effects:
   - **Outer RGB Glow**: Flowing color spectrum border (6s animation cycle)
   - **Border Lights**: Animated Christmas light bars in black border area (20s cycle with twinkling)

@@ -1,6 +1,8 @@
 # My Thoughts
 
 ## Current Context
+[AMENDED 2026-08-19]: Split menu/play worlds, added 500×500 heightmap generation with a border, tree decoration kits, and a rotating circular minimap.
+
 Refactored the Voxel Christmas project from a monolithic HTML file to a modular ES6 structure.
 - **Date**: 2025-11-25
 - **Status**: Refactor complete. Visual tweaks applied (snow intensity, house windows). Documentation updated.
