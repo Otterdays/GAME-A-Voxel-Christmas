@@ -11,6 +11,9 @@
 - **Menu and Play Worlds Are Separate**: Menu preview lives in its own group. Entering a world hides the menu scene; quitting restores it. Shared voxel geometry/materials are no longer disposed when clearing a play world.
 - **Stats Overlay**: Moved to the top-left so it does not cover the minimap.
 
+### Fixed
+- **Black main menu:** Splash dismiss now shows `#game-canvas` (the WebGL scene) instead of the first `<canvas>`, which had become the minimap.
+
 ### Added
 - **Performance Monitoring System**:
   - Visual performance stats overlay (FPS, draw calls, triangles, memory)
