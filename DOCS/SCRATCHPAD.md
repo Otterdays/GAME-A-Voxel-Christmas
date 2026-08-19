@@ -1,5 +1,13 @@
 # Scratchpad
 
+## 2026-08-19: Menu scene canvas stayed hidden
+
+### Bug
+After adding the minimap `<canvas>`, splash dismiss used `document.querySelector('canvas')` and revealed the minimap instead of the WebGL view. The 3D menu stayed `display: none` (black page).
+
+### Fix
+WebGL canvas is `#game-canvas`. Splash reveal targets that id (and ignores `#minimap-canvas`).
+
 ## 2026-08-19: Separate worlds, 500-block gen, trees, minimap
 
 ### Problem
