@@ -11,6 +11,7 @@ export function createRenderer({ antialias = true, pixelRatio = Math.min(window.
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(pixelRatio);
     renderer.toneMapping = THREE.ReinhardToneMapping;
+    renderer.domElement.id = 'game-canvas';
     
     // PERFORMANCE OPTIMIZATIONS
     renderer.sortObjects = true; // Enable object sorting for better batching

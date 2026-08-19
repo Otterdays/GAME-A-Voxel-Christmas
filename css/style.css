@@ -301,7 +301,7 @@ body {
     backdrop-filter: blur(4px);
 }
 
-canvas {
+canvas:not(#minimap-canvas) {
     display: block;
     position: relative;
     z-index: 1;

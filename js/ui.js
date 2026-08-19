@@ -1455,9 +1455,10 @@ export function setupSplashScreen() {
         splashScreen.classList.remove('splash-screen-visible');
         splashScreen.classList.add('splash-screen-hidden');
         
-        // Show canvas now that splash is dismissed (scene was already loading in background)
+        // Show the WebGL scene canvas (not the minimap canvas)
         setTimeout(() => {
-            const canvas = document.querySelector('canvas');
+            const canvas = document.getElementById('game-canvas')
+                || document.querySelector('canvas:not(#minimap-canvas)');
             if (canvas) {
                 canvas.style.display = 'block';
                 console.log('✅ Canvas revealed - scene was already loaded!');
